@@ -14,9 +14,18 @@
    terrain) in **one custom biome** injected into the overworld via **Biolith** — exactly
    like the sibling mod `desolation` does. Everything else (cities, streets, highways,
    railways, spheres, damage, corridors, commands, GUI, profiles, network) is **NOT ported**.
-2. **The new mod lives in `lostbuildings/` in THIS repo** (own Gradle project, own
-   `settings.gradle`). The original Forge sources stay untouched at `src/main/java/mcjty/lostcities/`
-   — they are your porting source, grep them, never edit them.
+2. **Repo layout** (this repo, branch `claude/lostsystems-port-plan-rwhs9t`):
+   ```
+   /home/user/LostCities/
+   ├── PORT-PLAN-26.2.md      # this file — the law (repo root)
+   ├── 1.21/                  # the ORIGINAL Forge Lost Cities mod (porting SOURCE)
+   │   └── src/main/java/mcjty/lostcities/…  +  src/main/resources/data/lostcities/…
+   └── lostbuildings/         # the NEW Fabric 26.2 mod (Agent A creates it; own Gradle project)
+   ```
+   The new mod lives in **`lostbuildings/`** (own `settings.gradle`, own Gradle project).
+   The original Forge sources under **`1.21/`** are your porting source — grep them,
+   **never edit them**. (`1.21/` is just where the old repo now sits; the source is Forge
+   **1.20**, but the folder name is fixed — do not rename it.)
 3. **Target is `26.2`** (year.drop scheme; never write "1.26.2"). 26.1+ is **unobfuscated**:
    NO mappings line in Gradle, NO yarn names. **Java 25**, Loom `1.17.13`, Gradle 9.6.x.
 4. **Lost Cities 1.20 source is ALREADY in Mojang names** (Forge uses official mappings).
@@ -36,15 +45,22 @@
 ## 1. Toolchain — DO THIS FIRST, NO DOWNLOADS
 
 The container is fresh: **Java 25 and Gradle 9.6.1 are NOT installed**, `/opt` only has
-Gradle 8.14.3. `./gradlew` CANNOT download its distribution (egress proxy → HTTP 403).
-NEVER run `./gradlew`. Set up once (orchestrator, step 0):
+Gradle 8.14.3 (too old — cannot run on Java 25). `./gradlew` CANNOT download its
+distribution (egress proxy → HTTP 403 on GitHub release assets). **NEVER run `./gradlew`.**
+
+**The Gradle 9.6.1 distribution is VENDORED in the LuckyTNT repo** — do NOT download it,
+do NOT re-vendor it into this repo. It lives as a multi-volume RAR at
+**`/home/user/Fabric-LuckyTNTMod/gradle-dist/`** (`install.sh` + `part1..5.rar`). That
+sibling repo is in-scope and present in this environment. Set up once (orchestrator, step 0):
 
 ```sh
-sudo apt-get install -y openjdk-25-jdk-headless
-/home/user/Fabric-LuckyTNTMod/gradle-dist/install.sh        # unpacks to /opt/gradle-9.6.1
+sudo apt-get install -y openjdk-25-jdk-headless unrar   # unrar is required by install.sh
+/home/user/Fabric-LuckyTNTMod/gradle-dist/install.sh    # reassembles RAR → unzips to /opt/gradle-9.6.1
 export JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64
-/opt/gradle-9.6.1/bin/gradle --version                       # verify before anything else
+/opt/gradle-9.6.1/bin/gradle --version                  # must print 9.6.1 before anything else
 ```
+If `/home/user/Fabric-LuckyTNTMod/` is somehow absent in a future session, the repo is in
+scope via `add_repo unknown-wq/fabric-luckytntmod` — clone it and use its `gradle-dist/`.
 
 All builds: `cd /home/user/LostCities/lostbuildings && JAVA_HOME=/usr/lib/jvm/java-25-openjdk-amd64 /opt/gradle-9.6.1/bin/gradle <task> --no-daemon 2>&1 | tee /tmp/errors.txt`
 **One Gradle invocation at a time in this checkout — never in parallel.**
@@ -93,7 +109,7 @@ or in `lostbuildings/` after the skeleton exists), unzips the
    `BlockStateParser`, `StructureVoid` handling…).
 3. **`Fabric-LuckyTNTMod/PORT-CHEATSHEET.md` + `PORT-MOD-26.2.md` §4** — recurring-error
    fixes and the verified rename table (useful even though our source is Forge-named).
-4. **This repo's `src/main/java/mcjty/lostcities/`** — the code being ported (§4).
+4. **`1.21/src/main/java/mcjty/lostcities/`** (in this repo) — the code being ported (§4).
 
 **Rule: never invent a signature.** If you can't confirm it in (1)–(2), grep harder or
 apply §9. Do not trust training memory — it predates the 26.x rewrites.
@@ -133,7 +149,8 @@ another agent owns, write against this contract — integration (Agent D) reconc
 
 ## 4. Verified fact sheet — the source code being ported (recon done — trust these)
 
-All paths under `src/main/java/mcjty/lostcities/`. Line numbers verified against HEAD.
+All paths below are relative to **`1.21/src/main/java/mcjty/lostcities/`**. Line numbers
+verified against HEAD.
 
 **Classes ported nearly as-is** (Agent B): `worldgen/lost/cityassets/`:
 `BuildingPart` (180 ln), `IBuildingPart` (29), `Palette` (130), `CompiledPalette` (230,
@@ -170,7 +187,7 @@ from `worldgen/LostCityTerrainFeature.java` (2327 ln):
 | `AssetRegistries`/`RegistryAssetRegistry` (Forge datapack registries) | whole mechanism | **new `AssetLoader`**: iterate `ResourceManager` JSONs under `data/lostbuildings/lostcities/**`, `Codec.parse(JsonOps.INSTANCE, …)` per RE codec — there is nothing to reuse here, write it against the RE codecs |
 | `Transform.transform(RailShape)` @70–205 (~136 ln) | railway-only | DELETE; keep the rest of Transform (~77 ln, rail-free) |
 
-**Data inventory** (`src/main/resources/data/lostcities/lostcities/`): buildings 34
+**Data inventory** (`1.21/src/main/resources/data/lostcities/lostcities/`): buildings 34
 (building1–8 present), parts 186, palettes 29, variants 12, conditions 3
 (`chestloot`,`easymobs`,`hardmobs`), styles 4 (`standard.json` present).
 ⚠ Correction to the old plan: there are **NO `building6_*/7_*/8_*` part files** —
@@ -221,7 +238,7 @@ zero references to `mcjty.*`, `net.minecraftforge.*`, `BuildingInfo` (beyond the
 **Files:** `src/main/resources/data/lostbuildings/lostcities/**` (copied),
 `world/feature/GroupBuildingPlacement.java`, `world/feature/Foundation.java`.
 **Tasks:** (1) copy all six data folders 1:1 from
-`src/main/resources/data/lostcities/lostcities/` (§4 inventory — whole folders, no edits).
+`1.21/src/main/resources/data/lostcities/lostcities/` (§4 inventory — whole folders, no edits).
 (2) `GroupBuildingPlacement implements BuildingPlacement`: group size `groupMin..groupMax`,
 lay 2–5 sites around origin at `spacing` (grid/ring + rand jitter); per site:
 `getHeightmapPos(WORLD_SURFACE_WG, …)`, random `Transform` rotation, pick building from
