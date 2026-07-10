@@ -14,8 +14,8 @@
     "foundation": true,
     "group_max": 5,
     "group_min": 2,
-    "max_floors": 3,
-    "min_floors": 1,
-    "spacing": 12
+    "max_floors": 6,
+    "min_floors": 2,
+    "spacing": 24
   }
 }

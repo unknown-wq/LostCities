@@ -23,12 +23,12 @@ public final class ModConfiguredFeatures {
 		FeatureUtils.register(context, LOST_BUILDING, ModFeatures.LOST_BUILDING, new LostBuildingConfig(
 				List.of("building1", "building2", "building3", "building4",
 						"building5", "building6", "building7", "building8"),
-				1,   // minFloors
-				3,   // maxFloors
+				2,   // minFloors
+				6,   // maxFloors (multi-story: engine randomizes floors in [min,max] per building)
 				true, // foundation
 				2,   // groupMin
 				5,   // groupMax
-				12   // spacing
+				24   // spacing (>footprint so streets have gaps to run through)
 		));
 	}
 

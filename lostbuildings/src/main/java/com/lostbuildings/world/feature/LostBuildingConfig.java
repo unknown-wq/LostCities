@@ -28,11 +28,11 @@ public record LostBuildingConfig(
 ) implements FeatureConfiguration {
 	public static final Codec<LostBuildingConfig> CODEC = RecordCodecBuilder.create((instance) -> instance.group(
 			Codec.STRING.listOf().fieldOf("buildings").forGetter(LostBuildingConfig::buildings),
-			Codec.INT.fieldOf("min_floors").orElse(1).forGetter(LostBuildingConfig::minFloors),
-			Codec.INT.fieldOf("max_floors").orElse(3).forGetter(LostBuildingConfig::maxFloors),
+			Codec.INT.fieldOf("min_floors").orElse(2).forGetter(LostBuildingConfig::minFloors),
+			Codec.INT.fieldOf("max_floors").orElse(6).forGetter(LostBuildingConfig::maxFloors),
 			Codec.BOOL.fieldOf("foundation").orElse(true).forGetter(LostBuildingConfig::foundation),
 			Codec.INT.fieldOf("group_min").orElse(2).forGetter(LostBuildingConfig::groupMin),
 			Codec.INT.fieldOf("group_max").orElse(5).forGetter(LostBuildingConfig::groupMax),
-			Codec.INT.fieldOf("spacing").orElse(12).forGetter(LostBuildingConfig::spacing)
+			Codec.INT.fieldOf("spacing").orElse(24).forGetter(LostBuildingConfig::spacing)
 	).apply(instance, LostBuildingConfig::new));
 }

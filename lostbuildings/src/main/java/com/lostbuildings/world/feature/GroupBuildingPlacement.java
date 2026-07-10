@@ -114,6 +114,12 @@ public class GroupBuildingPlacement implements BuildingPlacement {
             placedAny = true;
         }
 
+        // Connect the placed buildings with simple streets running through the gaps between
+        // footprints (§11b lightweight approach — not a city/street engine port).
+        if (placedAny) {
+            Streets.connect(level, placedBoxes, FOOTPRINT, rand);
+        }
+
         return placedAny;
     }
 

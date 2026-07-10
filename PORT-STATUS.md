@@ -78,6 +78,32 @@ Agent D (integration), block-id resolution in `engine/util/Tools.stringToState`:
   (which previously aborted `AssetLoader` and the whole server). Cosmetic-safe per §9.
   Boot log showed ZERO such fallbacks, so no visual holes are expected from this.
 
+### Phase 2 (multi-story + streets) — 2026-07-10
+
+- **Multi-story = config only, no engine work.** The ported `BuildingEngine.generateBuilding`
+  was already floor-based and NOT clamped (`pickFloors` reads `PlaceSettings.min/maxFloors`,
+  loop `for f in 0..floors`, 6-block slice per floor + top part). Phase 1 was simply fed a
+  conservative range. No re-port of the floor loop was needed; nothing was re-enabled or cut.
+- **No per-building floor data.** `building1..8` all omit `minfloors/maxfloors` (they used the
+  Lost Cities citystyle/profile defaults, which are NOT ported). So there is no per-building
+  max to feed; the group config drives floors uniformly. Verified building1–8 have 4–9 floor
+  parts + 3–5 top parts each, with **no** `ground/floor/range/cellar` part constraints, so any
+  floor count in the new range reuses parts safely (no gaps). Raised range to **min 2 / max 6**
+  floors (engine randomizes per building). `Foundation` clear-volume already scales off
+  `config.maxFloors` → `(6+1)*6+4 = 46` blocks cleared over the full 16×16 footprint, so it
+  covers the full stacked height automatically — no `Foundation.java` change required.
+- **Streets = lightweight (§11b preferred), not an engine port.** New `Streets.java` chains the
+  placed building sites (NW corners) with L-shaped Manhattan paths, **3 wide**, material
+  `Blocks.STONE_BRICKS`, laid on the natural terrain surface per column via
+  `getHeightmapPos(WORLD_SURFACE_WG)` (`.below()` = surface block), 2 blocks cleared above.
+  Columns inside any footprint are skipped (never carves through a house); liquid columns are
+  skipped (no roads over water). setBlock flag 19. No curb/lamps (kept simple). Called from
+  `GroupBuildingPlacement.place()` after the group is laid.
+- **Spacing bumped 12→24** (still `>= FOOTPRINT`). Required: at the old spacing (clamped to 16 =
+  footprint width) adjacent footprints touched edge-to-edge, leaving **no gap** for a street to
+  show — all street columns would fall inside footprints and be skipped. 24 gives ~8-block gaps
+  where the road is visible. No §9 cuts were needed in Phase 2.
+
 ## Verification
 
 All GREEN (Agent D, 2026-07-10; Java 25 / Gradle 9.6.1, `--no-daemon`):
@@ -96,9 +122,27 @@ All GREEN (Agent D, 2026-07-10; Java 25 / Gradle 9.6.1, `--no-daemon`):
   every palette block id resolved (after the `chain`→`iron_chain` and `red_sandstone@2`
   fixes logged above).
 
+### Phase 2 re-verification — 2026-07-10 (Java 25 / Gradle 9.6.1, `--no-daemon`)
+
+| Task | Result |
+|---|---|
+| `gradle compileJava` | **GREEN** (one deprecation note in `Streets.java` re `BlockState.liquid()` — non-blocking) |
+| `gradle build` | **GREEN** (BUILD SUCCESSFUL) |
+| `gradle runDatagen` | **GREEN** — 3 files, `lost_building` configured/placed + `lost_city` biome |
+| `gradle runServer` | **GREEN** — `Done (5.060s)! For help, type "help"` with **0 `/ERROR]` lines**, **0 "falling back to AIR"** warnings; **fresh world** (`run/world` deleted first) so multi-story + street worldgen was actually exercised; clean shutdown |
+
+Note: the first Phase-2 runServer reused a cached `run/world` (booted in 0.5s, no worldgen).
+`run/world` was deleted and the server re-run to force real generation → 5.06s boot with the
+new code paths exercised, still zero errors and zero AIR fallbacks (STONE_BRICKS street blocks
+and all floor parts resolved). No new "AIR fallback" warnings introduced by Phase 2.
+
 ### For a human with a client (in-world visual pass — the only remaining step, §10)
 - Confirm building GROUPS actually spawn inside a `lost_city` biome (feature placement fires
   probabilistically; boot exercised the path with no errors, but visual density/variety was
   not observed headless).
 - Check foundations sit on terrain (no floating/clipping), building variety across
   building1–8, corrected stairs/fences, and chest loot / spawner behaviour.
+- **Phase 2:** confirm buildings now rise **2–6 floors** with a capping top part (no floating /
+  clipping at the new heights, foundation clears the full stack); and that **stone-brick streets
+  (3 wide)** run through the gaps between buildings, following terrain, without carving through
+  houses or floating over water.
