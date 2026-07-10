@@ -1,0 +1,107 @@
+[20:02:08] [main/INFO] (FabricLoader/GameProvider) Loading Minecraft 26.2 with Fabric Loader 0.19.3
+[20:02:08] [main/INFO] (FabricLoader/Mappings) Mappings not present!
+[20:02:08] [main/INFO] (FabricLoader) Loading 44 mods:
+	- biolith 3.6.0-alpha.9
+	- fabric-api 0.154.2+26.2
+	   |-- fabric-key-mapping-api-v1 2.0.5+e2bdee789e
+	   |-- fabric-model-loading-api-v1 8.0.15+c80601bb9e
+	   |-- fabric-renderer-api-v1 14.1.2+2b0d8a229e
+	   |-- fabric-renderer-indigo 9.1.2+2b0d8a229e
+	   |-- fabric-rendering-v1 25.3.1+6988455e9e
+	   |-- fabric-screen-api-v1 5.1.0+48e3c0b09e
+	   \-- fabric-sound-api-v1 2.0.5+11a26f319e
+	- fabric-api-base 2.0.4+ece063239e
+	- fabric-api-lookup-api-v1 2.0.17+11e1c9a39e
+	- fabric-biome-api-v1 18.0.6+c7bd5b8e9e
+	- fabric-block-api-v1 3.0.3+ec56b6019e
+	- fabric-block-getter-api-v2 2.0.7+ec56b6019e
+	- fabric-command-api-v2 3.1.0+00cb03469e
+	- fabric-content-registries-v0 11.2.2+b7a678a99e
+	- fabric-convention-tags-v2 4.7.0+1f023a9e9e
+	- fabric-crash-report-info-v1 1.0.5+086d547a9e
+	- fabric-creative-tab-api-v1 5.0.14+d871b99e9e
+	- fabric-data-attachment-api-v1 2.2.17+aa0fd6fe9e
+	- fabric-data-generation-api-v1 25.4.4+9e7dc27f9e
+	- fabric-debug-api-v1 1.0.2+c792624d9e
+	- fabric-dimensions-v1 5.1.9+9cbf5da59e
+	- fabric-entity-events-v1 5.0.5+06488ac19e
+	- fabric-events-interaction-v0 5.2.6+8f57f7ee9e
+	- fabric-game-rule-api-v1 4.0.8+46a6d00c9e
+	- fabric-gametest-api-v1 4.0.21+4a7fa0819e
+	- fabric-item-api-v1 14.2.0+7aec7be39e
+	- fabric-lifecycle-events-v1 4.1.3+4575b05f9e
+	- fabric-loot-api-v3 3.0.17+06488ac19e
+	- fabric-menu-api-v1 2.0.16+086d547a9e
+	- fabric-message-api-v1 7.0.7+086d547a9e
+	- fabric-networking-api-v1 6.3.3+72073ef09e
+	- fabric-object-builder-api-v1 24.1.0+6fcd5f039e
+	- fabric-particles-v1 5.0.18+d1756aa99e
+	- fabric-permission-api-v1 1.0.3+b7020ca29e
+	- fabric-recipe-api-v1 9.0.20+11e1c9a39e
+	- fabric-registry-sync-v0 7.1.0+c7bd5b8e9e
+	- fabric-rendering-fluids-v1 6.0.4+06488ac19e
+	- fabric-resource-conditions-api-v1 6.1.0+10e9a28b9e
+	- fabric-resource-loader-v0 3.3.20+4fc5413f9e
+	- fabric-resource-loader-v1 2.0.13+9edec1269e
+	- fabric-serialization-api-v1 2.0.4+11a26f319e
+	- fabric-tag-api-v1 2.1.3+794df31d9e
+	- fabric-transfer-api-v1 8.0.11+39b5a3929e
+	- fabric-transitive-access-wideners-v1 8.1.4+67c847259e
+	- fabricloader 0.19.3
+	- java 25
+	- lostbuildings 1.0.0
+	- minecraft 26.2
+	- mixinextras 0.5.4
+[20:02:09] [main/INFO] (FabricLoader/Mixin) SpongePowered MIXIN Subsystem Version=0.8.7 Source=file:/root/.gradle/caches/modules-2/files-2.1/net.fabricmc/sponge-mixin/0.17.3+mixin.0.8.7/41c4a3984a80f4679e759fb9f495587acc5cdac7/sponge-mixin-0.17.3+mixin.0.8.7.jar Service=Knot/Fabric Env=SERVER
+[20:02:09] [main/INFO] (FabricLoader/Mixin) Compatibility level set to JAVA_25
+[20:02:09] [main/INFO] (FabricLoader/MixinExtras|Service) Initializing MixinExtras via com.llamalad7.mixinextras.service.MixinExtrasServiceImpl(version=0.5.4).
+[20:02:16] [main/INFO] (biolith) Biolith for Fabric is initializing...
+[20:02:16] [main/INFO] (Lostbuildings) Lost Buildings initialized!
+[20:02:16] [main/ERROR] (Minecraft) Failed to load properties from file: server.properties
+java.nio.file.NoSuchFileException: server.properties
+	at java.base/sun.nio.fs.UnixException.translateToIOException(UnixException.java:92)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:106)
+	at java.base/sun.nio.fs.UnixException.rethrowAsIOException(UnixException.java:111)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newFileChannel(UnixFileSystemProvider.java:213)
+	at java.base/sun.nio.fs.UnixFileSystemProvider.newByteChannel(UnixFileSystemProvider.java:244)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:357)
+	at java.base/java.nio.file.Files.newByteChannel(Files.java:399)
+	at java.base/java.nio.file.spi.FileSystemProvider.newInputStream(FileSystemProvider.java:371)
+	at java.base/java.nio.file.Files.newInputStream(Files.java:154)
+	at knot//net.minecraft.server.dedicated.Settings.loadFromFile(Settings.java:62)
+	at knot//net.minecraft.server.dedicated.DedicatedServerProperties.fromFile(DedicatedServerProperties.java:156)
+	at knot//net.minecraft.server.dedicated.DedicatedServerSettings.<init>(DedicatedServerSettings.java:12)
+	at knot//net.minecraft.server.Main.main(Main.java:117)
+	at net.fabricmc.loader.impl.game.minecraft.MinecraftGameProvider.launch(MinecraftGameProvider.java:514)
+	at net.fabricmc.loader.impl.launch.knot.Knot.launch(Knot.java:72)
+	at net.fabricmc.loader.impl.launch.knot.KnotServer.main(KnotServer.java:23)
+	at net.fabricmc.devlaunchinjector.Main.main(Main.java:86)
+[20:02:16] [main/INFO] (Minecraft) Environment: Environment[sessionHost=https://sessionserver.mojang.com, servicesHost=https://api.minecraftservices.com, profilesHost=https://api.mojang.com, name=PROD]
+[20:02:17] [Worker-Main-2/INFO] (Minecraft) No existing world data, creating new world
+[20:02:18] [main/INFO] (Minecraft) Loaded 1585 recipes
+[20:02:19] [main/INFO] (Minecraft) Loaded 1688 advancements
+[20:02:19] [main/INFO] (BiomeModificationImpl) Applied 0 biome modifications to 0 of 67 new biomes in 1.355 ms
+[20:02:19] [Server thread/ERROR] (Minecraft) Encountered an unexpected exception
+java.lang.RuntimeException: Failed to load Lost Cities asset 'lostbuildings:lostcities/palettes/bricks_desert_redsand.json'!
+	at knot//com.lostbuildings.engine.AssetLoader.forEach(AssetLoader.java:84)
+	at knot//com.lostbuildings.engine.AssetLoader.load(AssetLoader.java:42)
+	at knot//com.lostbuildings.LostBuildings.lambda$onInitialize$0(LostBuildings.java:35)
+	at knot//net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents.lambda$static$1(ServerLifecycleEvents.java:38)
+	at knot//net.minecraft.server.MinecraftServer.handler$zhg000$fabric-lifecycle-events-v1$beforeSetupServer(MinecraftServer.java:3919)
+	at knot//net.minecraft.server.MinecraftServer.runServer(MinecraftServer.java:741)
+	at knot//net.minecraft.server.MinecraftServer.lambda$spin$0(MinecraftServer.java:320)
+	at java.base/java.lang.Thread.run(Thread.java:1474)
+Caused by: net.minecraft.IdentifierException: Non [a-z0-9/._-] character in path of location: minecraft:red_sandstone@2
+	at knot//net.minecraft.resources.Identifier.assertValidPath(Identifier.java:282)
+	at knot//net.minecraft.resources.Identifier.createUntrusted(Identifier.java:42)
+	at knot//net.minecraft.resources.Identifier.bySeparator(Identifier.java:74)
+	at knot//net.minecraft.resources.Identifier.parse(Identifier.java:50)
+	at knot//com.lostbuildings.engine.util.Tools.stringToState(Tools.java:31)
+	at knot//com.lostbuildings.engine.Palette.parsePaletteArray(Palette.java:71)
+	at knot//com.lostbuildings.engine.AssetLoader.lambda$load$1(AssetLoader.java:45)
+	at knot//com.lostbuildings.engine.AssetLoader.forEach(AssetLoader.java:82)
+	... 7 more
+[20:02:19] [Server thread/ERROR] (Minecraft) This crash report has been saved to: /home/user/LostCities/lostbuildings/run/crash-reports/crash-2026-07-10_20.02.19-server.txt
+[20:02:19] [Server thread/INFO] (Minecraft) Stopping server
+[20:02:19] [Server thread/INFO] (Minecraft) Saving worlds
+[20:02:19] [Server thread/INFO] (Minecraft) ThreadedAnvilChunkStorage: All dimensions are saved

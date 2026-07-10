@@ -11,7 +11,7 @@ import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
  */
 public class LostBuildingFeature extends Feature<LostBuildingConfig> {
 	/** Swapped to GroupBuildingPlacement by Agent D once the engine + data exist. */
-	public static BuildingPlacement PLACEMENT = new StubBuildingPlacement();
+	public static BuildingPlacement PLACEMENT = new GroupBuildingPlacement();
 
 	public LostBuildingFeature(Codec<LostBuildingConfig> codec) {
 		super(codec);

@@ -22,8 +22,8 @@ public class LostBuildings implements ModInitializer {
 	 */
 	public static Assets ASSETS;
 
-	/** Stateless building generation engine (owner: Agent B). */
-	public static final BuildingEngine ENGINE = new BuildingEngine();
+	/** Building generation engine (owner: Agent B). Instance-based — built after ASSETS loads. */
+	public static BuildingEngine ENGINE;
 
 	@Override
 	public void onInitialize() {
@@ -33,6 +33,7 @@ public class LostBuildings implements ModInitializer {
 		// Load assets once the server's ResourceManager is available (datapacks applied).
 		ServerLifecycleEvents.SERVER_STARTING.register(server -> {
 			ASSETS = AssetLoader.load(server.getResourceManager());
+			ENGINE = new BuildingEngine(ASSETS);
 			LOGGER.info("Lost Buildings assets loaded.");
 		});
 

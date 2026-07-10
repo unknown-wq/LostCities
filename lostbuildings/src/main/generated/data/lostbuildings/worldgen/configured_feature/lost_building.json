@@ -1,0 +1,21 @@
+{
+  "type": "lostbuildings:lost_building",
+  "config": {
+    "buildings": [
+      "building1",
+      "building2",
+      "building3",
+      "building4",
+      "building5",
+      "building6",
+      "building7",
+      "building8"
+    ],
+    "foundation": true,
+    "group_max": 5,
+    "group_min": 2,
+    "max_floors": 3,
+    "min_floors": 1,
+    "spacing": 12
+  }
+}
