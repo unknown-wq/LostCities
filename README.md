@@ -76,6 +76,18 @@ during development lives in the sibling LuckyTNT repo's `gradle-dist/`.)
     the building's own footprint. Not the full Lost Cities damage engine, but no longer sterile.
   - **Yard decoration** — `Decorations` sprinkles the leftover ground with sparse lamp posts
     (fence + lantern), grass/ferns/flowers and the odd leaf bush, only on natural grass/dirt.
+- **Building-level variety (1.2)** — the buildings themselves now generate differently, not just
+  where/what-material:
+  - **Hybrid buildings** — ~35% of buildings are "hybrids" (`FloorParts`): some floors borrow a
+    role-compatible part (same top/ground/floor role) from a *different* building, so the 34
+    authored buildings recombine into many novel silhouettes. Ground floors stay native (coherent
+    entrances); middle/top floors borrow more freely. The engine merges a borrowed floor's donor
+    palette and falls back to the native part if a borrowed part can't resolve, so hybrids never
+    break a building.
+  - **Procedural rooftops** — every building gets one rooftop feature (`Roofs`) rolled from a
+    weighted set: parapet ring, antenna/mast, water tower, rooftop garden, HVAC cluster, small
+    penthouse, or nothing (~52% stay plain/none). Layered on the existing top and aged by the
+    weathering pass, bounded to the footprint, all vanilla blocks — the skyline stops being flat.
 - **Verified GREEN** (Java 25 / Gradle 9.6.1): `compileJava`, `build`, `runDatagen`, and a
   dedicated-server `runServer` boot to `Done (…)!` with **zero errors** while generating
   spawn chunks; the biome registers and Biolith-injects.
@@ -102,9 +114,11 @@ during development lives in the sibling LuckyTNT repo's `gradle-dist/`.)
 The dedicated server boots clean, but headless can't observe visuals. In a real client,
 check: building-group density & variety (standalone landmarks + 2×2 multi-buildings), the
 multi-story rise with capping tops (no floating/clipping), the 2×2 quadrants lining up into
-one coherent building, foundations vs terrain, biome-driven styles (desert vs standard), the
-weathering intensity (aged, not destroyed), the yard decoration density, the 3-wide streets
-through the gaps, and chest-loot / spawner behavior.
+one coherent building, hybrid buildings reading as coherent (borrowed floors not clashing),
+the rooftop features (antennas / water towers / gardens / parapets, not too busy),
+foundations vs terrain, biome-driven styles (desert vs standard), the weathering intensity
+(aged, not destroyed), the yard decoration density, the 3-wide streets through the gaps, and
+chest-loot / spawner behavior.
 
 ### Fixed in 1.0.1
 - Buildings no longer generate clipped (only one wall) — they were straddling chunk borders
