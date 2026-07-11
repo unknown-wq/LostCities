@@ -340,3 +340,44 @@ Branch: `claude/lostsystems-port-plan-rwhs9t` (this repo). Push after every phas
 with zero `/ERROR]` lines while generating spawn chunks; everything pushed; status file
 complete. In-game visual pass (house groups, foundations, variety, loot) is the only step
 left to a human with a client.
+
+---
+
+## 11. Phase 2 — ONLY after Phase 1 is green (multi-story buildings + streets)
+
+Do NOT start this until §10 DONE holds (server boots green with the simple building groups).
+Phase 2 is a separate orchestrator pass with its own agents, committed on the same PR branch.
+Requested scope: **taller multi-story buildings** and **streets between the buildings in a group**.
+
+### 11a. Multi-story buildings
+The Lost Cities data + the ported engine are already floor-based: `Building` carries min/max
+floors and `generateBuilding` stacks a part per floor + a top part. So multi-story is mostly
+a **config/enable** step, not new engine work:
+1. Raise the floor range: `LostBuildingConfig.maxFloors` (and the `PlaceSettings` fed to the
+   engine) from the Phase-1 conservative value to the buildings' real max (grep each
+   `1.21/src/main/resources/data/lostcities/lostcities/buildings/building*.json` for
+   `minfloors`/`maxfloors`/`maxcellars`). Feed per-building max, don't hardcode one number.
+2. Verify the engine's floor loop actually iterates floors (not clamped to 1 by a Phase-1
+   §9 cut — check `PORT-STATUS.md` "Disabled content"). If a §9 cut disabled the loop,
+   re-port it now against `/opt/mc-src`.
+3. Foundation/clear-volume (`Foundation.java`) must clear the FULL stacked height, not one
+   segment — pass the real building height (floors × slice height).
+4. Verify in-world: buildings rise multiple floors, top part caps them, no floating/clipping.
+
+### 11b. Streets between buildings
+Phase 1 deliberately cut the Lost Cities city/street/highway engine (`City`, `Highway`,
+`Railway`, `Corridors`). Do NOT try to port that whole system. Two options — pick the
+cheaper one that looks right, log the choice in `PORT-STATUS.md`:
+- **Preferred (lightweight):** in `GroupBuildingPlacement`, after placing the group, connect
+  building footprints with simple roads — lay a 2–3 wide path of a street block
+  (e.g. `Blocks.STONE`/`GRAVEL`/a palette "street" material) along the grid lines between
+  sites, at the foundation top height, with a 1-block curb/lamp optional. This is new code
+  in `GroupBuildingPlacement`/a small `Streets.java`, not an engine port.
+- **Faithful (only if the lightweight look is unacceptable):** port the minimal street piece
+  from `1.21/.../worldgen/lost/` street parts + palettes (grep `street`, `Highway` in the
+  data) and place a straight street segment between buildings. Heavier; still avoid the full
+  city grid/`BuildingInfo` graph.
+
+Constraints unchanged: one biome, Biolith-injected, small groups; NO full city grid, NO
+highways/railways, NO damage. Same rules §6–§9 (copy desolation patterns, verify in
+`/opt/mc-src`, scale down + log if it resists). Update `PORT-STATUS.md` and the PR when green.
