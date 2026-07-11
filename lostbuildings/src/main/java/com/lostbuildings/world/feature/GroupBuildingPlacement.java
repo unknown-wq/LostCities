@@ -7,6 +7,7 @@ import com.lostbuildings.engine.CompiledPalette;
 import com.lostbuildings.engine.PlaceSettings;
 import com.lostbuildings.engine.Style;
 import com.lostbuildings.engine.Transform;
+import com.lostbuildings.world.gen.StyleSelector;
 import net.minecraft.core.BlockPos;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
@@ -37,8 +38,6 @@ public class GroupBuildingPlacement implements BuildingPlacement {
     private static final int FOOTPRINT = 16;
     /** Approximate blocks per floor (Lost Cities floor height). Used to size the clear volume. */
     private static final int FLOOR_HEIGHT = 6;
-    /** Default style name to build palettes from (styles/standard.json is present in data). */
-    private static final String DEFAULT_STYLE = "standard";
 
     @Override
     public boolean place(FeaturePlaceContext<LostBuildingConfig> ctx, Assets assets, BuildingEngine engine) {
@@ -51,8 +50,6 @@ public class GroupBuildingPlacement implements BuildingPlacement {
         if (buildingNames == null || buildingNames.isEmpty()) {
             return false;
         }
-
-        Style style = assets.getStyle(DEFAULT_STYLE);
 
         // Group size in [groupMin, groupMax], clamped to the number of usable cells (<=5).
         int groupMin = Math.max(1, config.groupMin());
@@ -90,6 +87,8 @@ public class GroupBuildingPlacement implements BuildingPlacement {
             }
 
             Transform transform = randomRotation(rand);
+            // Style is chosen per-building (biome/temperature aware) so a group can mix materials.
+            Style style = StyleSelector.pick(level, site, rand, assets);
             CompiledPalette pal = engine.buildPalette(assets, rand, style);
 
             PlaceSettings settings = new PlaceSettings(
