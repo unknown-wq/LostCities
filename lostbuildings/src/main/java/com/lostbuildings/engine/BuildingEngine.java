@@ -13,6 +13,9 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.CrossCollisionBlock;
+import net.minecraft.world.level.block.StairBlock;
+import net.minecraft.world.level.block.WallBlock;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
@@ -79,6 +82,11 @@ public class BuildingEngine {
 
         int floors = pickFloors(b, rand, s);
 
+        // Positions of connectable blocks (panes/bars/fences/walls/stairs) placed by this building.
+        // They are re-corrected in a second pass below, once every neighbour exists — otherwise a
+        // block placed before its same-building neighbour never sees it and stays disconnected.
+        List<BlockPos> connectables = new ArrayList<>();
+
         int height = 0;
         for (int f = 0; f <= floors; f++) {
             boolean isTop = (f == floors);
@@ -87,10 +95,21 @@ public class BuildingEngine {
             if (partName != null) {
                 BuildingPart part = assets.getPart(partName);
                 if (part != null) {
-                    generatePart(level, origin, part, t, 0, height, 0, palette, rand, s);
+                    generatePart(level, origin, part, t, 0, height, 0, palette, rand, s, connectables);
                 }
             }
             height += FLOORHEIGHT;
+        }
+
+        // Second correction pass: now the whole building is in the world, so pane/bar/fence/wall
+        // connections and stair shapes resolve against all four neighbours (bug: adjacent stained
+        // glass panes were not connecting because the neighbour was placed after correction).
+        for (BlockPos pos : connectables) {
+            BlockState cur = level.getBlockState(pos);
+            BlockState fixed = BlockStates.correct(level, pos, cur);
+            if (fixed != null && fixed != cur) {
+                level.setBlock(pos, fixed, SET_FLAGS);
+            }
         }
     }
 
@@ -118,7 +137,8 @@ public class BuildingEngine {
      * Generate a single part at (ox, oy, oz) relative to origin. Returns the y level above the part.
      */
     private int generatePart(WorldGenLevel level, BlockPos origin, IBuildingPart part, Transform transform,
-                             int ox, int oy, int oz, CompiledPalette basePalette, RandomSource rand, PlaceSettings s) {
+                             int ox, int oy, int oz, CompiledPalette basePalette, RandomSource rand, PlaceSettings s,
+                             List<BlockPos> connectables) {
         CompiledPalette compiledPalette = basePalette;
         Palette partPalette = part.getLocalPalette(assets);
         if (partPalette != null) {
@@ -170,6 +190,11 @@ public class BuildingEngine {
                         continue;   // STRUCTURE_VOID passthrough
                     }
                     level.setBlock(pos, corrected, SET_FLAGS);
+
+                    Block cb = corrected.getBlock();
+                    if (cb instanceof CrossCollisionBlock || cb instanceof WallBlock || cb instanceof StairBlock) {
+                        connectables.add(pos.immutable());
+                    }
 
                     if (inf != null && inf.loot() != null && !inf.loot().isEmpty() && s.loot()) {
                         handleLoot(level, pos, inf.loot(), rand);
