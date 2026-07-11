@@ -58,18 +58,37 @@ during development lives in the sibling LuckyTNT repo's `gradle-dist/`.)
 - **Connectable blocks corrected in a second pass** — stained-glass panes, iron bars, fences,
   walls and stairs are re-fitted to their neighbours after the whole building is placed, so
   adjacent panes/bars now connect.
+- **Procedural variety (1.1)** — settlements are no longer eight identical intact boxes:
+  - **Bigger roster & landmarks** — `cabin` and `radiotower` join the pool as rarer standalone
+    landmarks (`landmark_chance`), alongside `building1..8`.
+  - **2×2 multi-buildings** — ~1 in 4 groups (`multibuilding_chance`) assemble a full
+    `town` / `shopping` / `shopping_open` / `library` / `center` / `oilrig` from its four
+    `fam00/01/10/11` quadrants into a corner of the write window (un-rotated), sharing one
+    style, palette and floor count, with a standalone companion across the open ground.
+  - **Livelier layout** — the fixed cross is gone; standalone groups shuffle the checkerboard
+    cells and take a varied subset, so layout and street routing differ group to group.
+  - **Biome-aware styling** — `StyleSelector` picks the building style per site from the biome
+    climate: hot & dry biomes (deserts / savanna / badlands) build in the sandy `desert`
+    style, temperate ones in the brick/glass `standard` style, with a small per-building mix.
+  - **Procedural weathering** — a lightweight post-pass (`Weathering`) ages each building:
+    cracked/mossy stone-brick & cobble, sparse vines/cobwebs, a broken (crumbled) roofline, and
+    a little edge rubble (gravel / cobble slabs) — deterministic from the world seed, bounded to
+    the building's own footprint. Not the full Lost Cities damage engine, but no longer sterile.
+  - **Yard decoration** — `Decorations` sprinkles the leftover ground with sparse lamp posts
+    (fence + lantern), grass/ferns/flowers and the odd leaf bush, only on natural grass/dirt.
 - **Verified GREEN** (Java 25 / Gradle 9.6.1): `compileJava`, `build`, `runDatagen`, and a
   dedicated-server `runServer` boot to `Done (…)!` with **zero errors** while generating
   spawn chunks; the biome registers and Biolith-injects.
 
 ## ❌ What's NOT done / out of scope
 
-- **Cities as a whole** — no city grid, districts, city styles, spheres, scattered/predefined
-  buildings, or multi-buildings. Only standalone building groups.
+- **Cities as a whole** — no city grid, districts, city styles, spheres, or scattered/predefined
+  buildings. Standalone building groups plus occasional 2×2 multi-buildings only.
 - **Highways, railways, monorails, corridors** between/under buildings (only the lightweight
   surface streets above are generated).
-- **Damage / ruins / rubble** — buildings generate **intact & clean**; the whole damage engine,
-  explosions, and debris are not ported.
+- **Full damage engine** — the port has a lightweight procedural **weathering** pass (see above),
+  but not the original Lost Cities damage/explosion/debris system (blast holes, sinking, per-block
+  damage profiles). Multi-building **rotation** is also limited to `ROTATE_NONE`.
 - **Cellars** (`cellars = 0`), and the deferred POI / lighting / sapling passes.
 - **Commands, GUI, config screens, in-game editor, player data, networking, world profiles.**
 - **Condition filters simplified** — loot/mob picks are factor-weighted only; part-selection
@@ -81,9 +100,11 @@ during development lives in the sibling LuckyTNT repo's `gradle-dist/`.)
 ## Left to a human with a client
 
 The dedicated server boots clean, but headless can't observe visuals. In a real client,
-check: building-group density & variety, the multi-story rise with capping tops (no
-floating/clipping), foundations vs terrain, the 3-wide streets through the gaps, and
-chest-loot / spawner behavior.
+check: building-group density & variety (standalone landmarks + 2×2 multi-buildings), the
+multi-story rise with capping tops (no floating/clipping), the 2×2 quadrants lining up into
+one coherent building, foundations vs terrain, biome-driven styles (desert vs standard), the
+weathering intensity (aged, not destroyed), the yard decoration density, the 3-wide streets
+through the gaps, and chest-loot / spawner behavior.
 
 ### Fixed in 1.0.1
 - Buildings no longer generate clipped (only one wall) — they were straddling chunk borders

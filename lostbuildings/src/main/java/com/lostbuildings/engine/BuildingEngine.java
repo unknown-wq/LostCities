@@ -111,6 +111,11 @@ public class BuildingEngine {
                 level.setBlock(pos, fixed, SET_FLAGS);
             }
         }
+
+        // Final pass: procedural weathering so the finished building reads as an aged ruin rather
+        // than a pristine structure. Operates only within this building's 16x16 footprint column,
+        // from the ground floor up to the generated top (height == (floors+1) * FLOORHEIGHT here).
+        Weathering.apply(level, origin, 16, height, rand);
     }
 
     private int pickFloors(Building b, RandomSource rand, PlaceSettings s) {

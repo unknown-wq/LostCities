@@ -28,7 +28,13 @@ public final class ModConfiguredFeatures {
 				true, // foundation
 				2,   // groupMin
 				5,   // groupMax
-				24   // spacing (>footprint so streets have gaps to run through)
+				24,  // spacing (>footprint so streets have gaps to run through)
+				// Landmarks: rare standalone variety (a cabin in the weeds, a lone radio tower).
+				List.of("cabin", "radiotower"),
+				0.15f, // landmarkChance — ~1 in 7 standalone slots becomes a landmark
+				// 2x2 multi-buildings assembled from four quadrant JSONs each.
+				List.of("town", "shopping", "shopping_open", "library", "center", "oilrig"),
+				0.25f  // multibuildingChance — ~1 in 4 groups anchors a big 2x2 landmark building
 		));
 	}
 

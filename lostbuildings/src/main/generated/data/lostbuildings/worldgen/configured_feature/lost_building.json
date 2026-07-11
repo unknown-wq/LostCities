@@ -14,8 +14,22 @@
     "foundation": true,
     "group_max": 5,
     "group_min": 2,
+    "landmark_chance": 0.15,
+    "landmarks": [
+      "cabin",
+      "radiotower"
+    ],
     "max_floors": 6,
     "min_floors": 2,
+    "multibuilding_chance": 0.25,
+    "multibuildings": [
+      "town",
+      "shopping",
+      "shopping_open",
+      "library",
+      "center",
+      "oilrig"
+    ],
     "spacing": 24
   }
 }
