@@ -19,7 +19,7 @@ generated inside one custom biome that is injected into the vanilla overworld vi
 ## Install
 
 Requires Minecraft **26.2**, Fabric Loader ≥ 0.19.3, Fabric API `0.154.2+26.2`, and
-**Biolith** `3.6.0-alpha.9`. Drop `dist/lostbuildings-1.0.0-mc26.2.jar` into `mods/`.
+**Biolith** `3.6.0-alpha.9`. Drop `dist/lostbuildings-1.0.1-mc26.2.jar` into `mods/`.
 Find the biome in-game with `/locate biome lostbuildings:lost_city`.
 
 ## Build from source
@@ -52,6 +52,12 @@ during development lives in the sibling LuckyTNT repo's `gradle-dist/`.)
 - **Multi-story buildings** — buildings rise **2–6 floors** with a capping top part.
 - **Streets** — 3-wide stone-brick paths follow the terrain between buildings, skipping
   building footprints and water.
+- **Buildings are chunk-aligned** — each 16×16 building is snapped to a whole chunk cell inside
+  the feature's write window (a checkerboard of up to 5 chunks around the origin), so a building
+  never straddles a chunk border and can no longer be clipped down to a single wall.
+- **Connectable blocks corrected in a second pass** — stained-glass panes, iron bars, fences,
+  walls and stairs are re-fitted to their neighbours after the whole building is placed, so
+  adjacent panes/bars now connect.
 - **Verified GREEN** (Java 25 / Gradle 9.6.1): `compileJava`, `build`, `runDatagen`, and a
   dedicated-server `runServer` boot to `Done (…)!` with **zero errors** while generating
   spawn chunks; the biome registers and Biolith-injects.
@@ -78,3 +84,8 @@ The dedicated server boots clean, but headless can't observe visuals. In a real 
 check: building-group density & variety, the multi-story rise with capping tops (no
 floating/clipping), foundations vs terrain, the 3-wide streets through the gaps, and
 chest-loot / spawner behavior.
+
+### Fixed in 1.0.1
+- Buildings no longer generate clipped (only one wall) — they were straddling chunk borders
+  and the out-of-chunk parts were dropped; buildings are now chunk-aligned.
+- Stained-glass panes / iron bars now connect to their neighbours (second correction pass).
