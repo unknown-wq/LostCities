@@ -54,36 +54,34 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 
         Style style = assets.getStyle(DEFAULT_STYLE);
 
-        // Group size in [groupMin, groupMax], clamped to a sane 1..5.
+        // Group size in [groupMin, groupMax], clamped to the number of usable cells (<=5).
         int groupMin = Math.max(1, config.groupMin());
         int groupMax = Math.max(groupMin, config.groupMax());
         int count = groupMin + rand.nextInt(groupMax - groupMin + 1);
 
-        int spacing = Math.max(FOOTPRINT, config.spacing());
-
-        // Candidate sites arranged on a coarse grid around the origin, ring order
-        // (centre first, then the 8 neighbours, then outer) with light per-site jitter.
-        List<int[]> offsets = gridOffsets(count);
+        // A Feature may only write within the origin chunk +/-1 chunk (the FEATURES step's
+        // blockStateWriteRadius is 1); anything further is silently dropped, which used to slice
+        // buildings that straddled a chunk border down to a single wall. So snap every building to
+        // a whole chunk CELL inside that 3x3 window: a 16x16 building fills one chunk exactly and
+        // never crosses a border. Cells form a checkerboard (centre + 4 diagonals) so buildings
+        // touch only at corners and the orthogonal chunks between them stay free for streets.
+        int centerCX = origin.getX() >> 4;
+        int centerCZ = origin.getZ() >> 4;
+        List<int[]> cells = CHECKERBOARD_CELLS;
+        count = Math.min(count, cells.size());
 
         List<BlockPos> placedBoxes = new ArrayList<>(); // NW corners of already-placed footprints
         boolean placedAny = false;
 
-        for (int i = 0; i < offsets.size() && placedBoxes.size() < count; i++) {
-            int[] off = offsets.get(i);
-            int jitterX = rand.nextInt(7) - 3;
-            int jitterZ = rand.nextInt(7) - 3;
-            int wx = origin.getX() + off[0] * spacing + jitterX;
-            int wz = origin.getZ() + off[1] * spacing + jitterZ;
+        for (int i = 0; i < cells.size() && placedBoxes.size() < count; i++) {
+            int[] cell = cells.get(i);
+            int wx = (centerCX + cell[0]) << 4;   // chunk-aligned NW corner
+            int wz = (centerCZ + cell[1]) << 4;
 
-            // Ground height at this site (mirror desolation ScatteredFeature).
+            // Ground height at this cell (mirror desolation ScatteredFeature).
             BlockPos ground = level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE_WG,
                     new BlockPos(wx, origin.getY(), wz));
             BlockPos site = new BlockPos(wx, ground.getY(), wz);
-
-            // bbox anti-overlap: reject if this footprint overlaps an already-placed one.
-            if (overlaps(site, placedBoxes)) {
-                continue;
-            }
 
             String buildingName = buildingNames.get(rand.nextInt(buildingNames.size()));
             Building building = assets.getBuilding(buildingName);
@@ -124,37 +122,14 @@ public class GroupBuildingPlacement implements BuildingPlacement {
     }
 
     /**
-     * Grid offsets in ring order around (0,0): centre, then the 8 surrounding cells,
-     * then the next ring — enough to seat up to 5 non-overlapping sites.
+     * Chunk-cell offsets around the origin chunk, checkerboard order: centre first, then the four
+     * diagonal chunks. All lie within the FEATURES write window (origin chunk +/-1), and no two
+     * share a chunk edge, so buildings never merge and the orthogonal chunks between them are left
+     * open for {@link Streets}. Up to five buildings — matching the group max.
      */
-    private static List<int[]> gridOffsets(int count) {
-        List<int[]> list = new ArrayList<>();
-        int ring = 0;
-        while (list.size() < Math.max(count, 5) + 4) {
-            for (int dx = -ring; dx <= ring; dx++) {
-                for (int dz = -ring; dz <= ring; dz++) {
-                    if (Math.max(Math.abs(dx), Math.abs(dz)) == ring) {
-                        list.add(new int[]{dx, dz});
-                    }
-                }
-            }
-            ring++;
-            if (ring > 4) break;
-        }
-        return list;
-    }
-
-    /** True if a 16x16 footprint at {@code site} overlaps any already-placed footprint. */
-    private static boolean overlaps(BlockPos site, List<BlockPos> placed) {
-        for (BlockPos p : placed) {
-            boolean sepX = Math.abs(site.getX() - p.getX()) >= FOOTPRINT;
-            boolean sepZ = Math.abs(site.getZ() - p.getZ()) >= FOOTPRINT;
-            if (!sepX && !sepZ) {
-                return true;
-            }
-        }
-        return false;
-    }
+    private static final List<int[]> CHECKERBOARD_CELLS = List.of(
+            new int[]{0, 0},
+            new int[]{1, 1}, new int[]{1, -1}, new int[]{-1, 1}, new int[]{-1, -1});
 
     /** Pick one of the four cardinal rotations. Transform enum constants are stable (§4). */
     private static Transform randomRotation(RandomSource rand) {
