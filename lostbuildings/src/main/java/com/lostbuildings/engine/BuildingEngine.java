@@ -38,6 +38,8 @@ public class BuildingEngine {
     private static final int FLOORHEIGHT = 6;
     // Worldgen-safe flags: notify clients, do not trigger neighbour updates (bit 1 must stay off).
     private static final int SET_FLAGS = Block.UPDATE_CLIENTS;
+    /** Chance a given building is a "hybrid" that borrows some floors from other buildings. */
+    private static final float HYBRID_CHANCE = 0.35F;
 
     private final Assets assets;
     private final Map<Block, BlockEntityType<?>> typeCache = new HashMap<>();
@@ -87,15 +89,40 @@ public class BuildingEngine {
         // block placed before its same-building neighbour never sees it and stays disconnected.
         List<BlockPos> connectables = new ArrayList<>();
 
+        // Occasionally build a "hybrid": some floors are borrowed from other buildings for silhouette
+        // variety (see FloorParts). Decided once per building so a hybrid stays internally coherent.
+        boolean hybrid = rand.nextFloat() < HYBRID_CHANCE;
+
         int height = 0;
         for (int f = 0; f <= floors; f++) {
             boolean isTop = (f == floors);
             boolean isGround = (f == 0);
-            String partName = b.getRandomPart(rand, isTop, isGround, false, f);
-            if (partName != null) {
-                BuildingPart part = assets.getPart(partName);
+            FloorParts.Choice choice = FloorParts.pick(assets, b, rand, isTop, isGround, f, hybrid);
+            if (choice != null && choice.partName() != null) {
+                BuildingPart part = assets.getPart(choice.partName());
                 if (part != null) {
-                    generatePart(level, origin, part, t, 0, height, 0, palette, rand, s, connectables);
+                    // A borrowed floor may use palette symbols from its donor building; merge the
+                    // donor's local palette so those symbols resolve. Native floors use the base.
+                    CompiledPalette floorPalette = palette;
+                    if (choice.donor() != null) {
+                        Palette donorLocal = choice.donor().getLocalPalette(assets);
+                        if (donorLocal != null) {
+                            floorPalette = new CompiledPalette(palette, donorLocal);
+                        }
+                    }
+                    try {
+                        generatePart(level, origin, part, t, 0, height, 0, floorPalette, rand, s, connectables);
+                    } catch (RuntimeException ex) {
+                        // A borrowed part referenced a symbol this style does not define. Fall back to
+                        // the building's own part so a hybrid never fails the building as a whole.
+                        if (choice.donor() != null) {
+                            String nativeName = b.getRandomPart(rand, isTop, isGround, false, f);
+                            BuildingPart nativePart = nativeName != null ? assets.getPart(nativeName) : null;
+                            if (nativePart != null) {
+                                generatePart(level, origin, nativePart, t, 0, height, 0, palette, rand, s, connectables);
+                            }
+                        }
+                    }
                 }
             }
             height += FLOORHEIGHT;
@@ -111,6 +138,10 @@ public class BuildingEngine {
                 level.setBlock(pos, fixed, SET_FLAGS);
             }
         }
+
+        // Rooftop feature (antenna / water tower / garden / parapet / …) layered on the existing top
+        // for skyline variety. Runs before weathering so the roof feature ages with the building too.
+        Roofs.apply(level, origin, 16, height, rand);
 
         // Final pass: procedural weathering so the finished building reads as an aged ruin rather
         // than a pristine structure. Operates only within this building's 16x16 footprint column,

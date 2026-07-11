@@ -4,6 +4,7 @@ import com.lostbuildings.engine.codec.ConditionRE;
 import com.lostbuildings.engine.codec.DataTools;
 import com.lostbuildings.engine.codec.VariantRE;
 
+import java.util.Collection;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -26,6 +27,11 @@ public class Assets {
 
     public void putBuilding(String name, Building building) {
         buildings.put(name, building);
+    }
+
+    /** All loaded buildings, in no particular order. Used by hybrid part borrowing. */
+    public Collection<Building> getAllBuildings() {
+        return buildings.values();
     }
 
     public void putPart(String name, BuildingPart part) {
