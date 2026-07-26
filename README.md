@@ -13,6 +13,7 @@ generated inside one custom biome that is injected into the vanilla overworld vi
 | `lostbuildings/` | The **new Fabric 26.2 mod** (Java 25, Mojang mappings, Loom 1.17). |
 | `dist/` | Prebuilt jar — `lostbuildings-1.0.0-mc26.2.jar`. |
 | `1.21/` | The **original Forge Lost Cities** mod, kept read-only as the porting source. |
+| `gradle-dist/` | Vendored **Gradle 9.6.1** distribution for offline builds (see its README). |
 | `PORT-PLAN-26.2.md` | The execution plan (verified facts, agents A–D, autonomous loop). |
 | `PORT-STATUS.md` | Live status — contract deviations, disabled content, verification table. |
 
@@ -28,8 +29,16 @@ Find the biome in-game with `/locate biome lostbuildings:lost_city`.
 cd lostbuildings
 JAVA_HOME=/path/to/jdk-25 gradle build      # jar → lostbuildings/build/libs/
 ```
-(Needs Java 25 + Gradle 9.x — MC 26.2 requires them. The vendored Gradle 9.6.1 dist used
-during development lives in the sibling LuckyTNT repo's `gradle-dist/`.)
+Needs Java 25 + Gradle 9.x — MC 26.2 requires them, and `lostbuildings` ships no
+wrapper. If Gradle 9.x isn't installed (or the wrapper download is blocked by a
+restricted network), a Gradle 9.6.1 distribution is vendored under
+[`gradle-dist/`](gradle-dist/):
+
+```sh
+./gradle-dist/install.sh                                  # → /opt/gradle-9.6.1
+cd lostbuildings
+JAVA_HOME=/path/to/jdk-25 /opt/gradle-9.6.1/bin/gradle build --no-daemon
+```
 
 ---
 
