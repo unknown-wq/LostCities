@@ -13,6 +13,7 @@ generated inside one custom biome that is injected into the vanilla overworld vi
 | `lostbuildings/` | The **new Fabric 26.2 mod** (Java 25, Mojang mappings, Loom 1.17). |
 | `dist/` | **Untracked** (git-ignored) local output dir — see *Install* below. |
 | `1.21/` | The **original Forge Lost Cities** mod, kept read-only as the porting source. |
+| `gradle-dist/` | Vendored **Gradle 9.6.1** distribution for offline builds (see its README). |
 | `PORT-PLAN-26.2.md` | The execution plan (verified facts, agents A–D, autonomous loop). |
 | `PORT-STATUS.md` | Live status — contract deviations, disabled content, verification table. |
 
