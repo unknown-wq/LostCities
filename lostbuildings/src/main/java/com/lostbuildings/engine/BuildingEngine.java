@@ -149,11 +149,27 @@ public class BuildingEngine {
     }
 
     private int pickFloors(Building b, RandomSource rand, PlaceSettings s) {
-        int min = s.minFloors();
-        int max = s.maxFloors();
-        // A building that declares its own floor limits wins over the feature config. Intersecting
-        // the two ranges instead produced nonsense for buildings that only fit at one height
-        // (e.g. "cabin" with minfloors=maxfloors=1 came out as a 2-3 storey stack).
+        // A caller that already knows the storey count says so by passing an exact range. The
+        // placement pass needs the number up front (it clears the volume above the house before
+        // the engine runs), so it picks via pickFloors(...) below and hands the answer back here.
+        // Re-deriving it would let the two disagree and leave the top floors buried in terrain.
+        if (s.minFloors() == s.maxFloors()) {
+            return s.minFloors();
+        }
+        return pickFloors(b, rand, s.minFloors(), s.maxFloors());
+    }
+
+    /**
+     * Canonical storey-count selection: a building that declares its own floor limits wins over the
+     * feature config. Intersecting the two ranges instead produced nonsense for buildings that only
+     * fit at one height (e.g. "cabin" with minfloors=maxfloors=1 came out as a 2-3 storey stack).
+     *
+     * <p>Public because {@code GroupBuildingPlacement} must reach the same number before generation
+     * starts; keeping one implementation is what stops the two from drifting apart.
+     */
+    public static int pickFloors(Building b, RandomSource rand, int configMin, int configMax) {
+        int min = configMin;
+        int max = configMax;
         if (b.getMinFloors() >= 0) {
             min = b.getMinFloors();
         }

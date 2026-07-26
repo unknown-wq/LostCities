@@ -6,3 +6,6 @@ dist/
 .gradle/
 build/
 *.class
+
+# Agent worktrees (transient)
+.claude/worktrees/

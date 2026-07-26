@@ -106,7 +106,7 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 			if (config.foundation()) {
 				Foundation.build(level, site, FOOTPRINT, FOOTPRINT,
 						clearHeight(building, floors, cellTerrainTop(level, origin, wx, wz) - groundY),
-						fillerState(building, pal), settings.waterLevel(), rand);
+						fillerState(building, pal, rand), settings.waterLevel(), rand);
 			}
 
 			engine.generateBuilding(level, site, rand, transform, building, pal, settings);
@@ -191,8 +191,8 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 	 * The building's own filler block, resolved through the group's palette, so a plinth under a
 	 * sandstone house is sandstone rather than a cobblestone stump.
 	 */
-	private static BlockState fillerState(Building building, CompiledPalette palette) {
-		BlockState state = palette.get(building.getFillerBlock());
+	private static BlockState fillerState(Building building, CompiledPalette palette, RandomSource rand) {
+		BlockState state = palette.get(building.getFillerBlock(), rand);
 		return state == null ? Foundation.DEFAULT_FILL : state;
 	}
 
@@ -221,29 +221,12 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 	}
 
 	/**
-	 * Storey count for one building, clamped by both the feature config and the building's own
-	 * declared limits. Mirrors {@code BuildingEngine.pickFloors} so that handing the result back as
-	 * {@code PlaceSettings(floors, floors, ...)} reproduces exactly this number.
+	 * Storey count for one building. Delegates to {@link BuildingEngine#pickFloors} so the number
+	 * used to clear the volume above the house is the same one the engine builds to — a local copy
+	 * of the rule drifted out of sync the moment the engine's own version changed.
 	 */
 	private static int pickFloors(Building building, RandomSource rand, LostBuildingConfig config) {
-		int min = config.minFloors();
-		int max = config.maxFloors();
-		if (Boolean.TRUE.equals(building.getOverrideFloors())
-				&& building.getMinFloors() >= 0 && building.getMaxFloors() >= 0) {
-			min = building.getMinFloors();
-			max = building.getMaxFloors();
-		} else {
-			if (building.getMinFloors() >= 0) {
-				min = Math.max(min, building.getMinFloors());
-			}
-			if (building.getMaxFloors() >= 0) {
-				max = Math.min(max, building.getMaxFloors());
-			}
-		}
-		if (max < min) {
-			max = min;
-		}
-		return max > min ? min + rand.nextInt(max - min + 1) : min;
+		return BuildingEngine.pickFloors(building, rand, config.minFloors(), config.maxFloors());
 	}
 
 	/** Pick one of the four cardinal rotations. Transform enum constants are stable (§4). */
