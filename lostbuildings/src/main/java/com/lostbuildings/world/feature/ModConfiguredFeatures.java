@@ -14,9 +14,7 @@ import java.util.List;
 public final class ModConfiguredFeatures {
 	public static final ResourceKey<ConfiguredFeature<?, ?>> LOST_BUILDING = createRegistryKey("lost_building");
 
-	@SuppressWarnings("UnnecessaryReturnStatement")
 	private ModConfiguredFeatures() {
-		return;
 	}
 
 	public static void bootstrap(BootstrapContext<ConfiguredFeature<?, ?>> context) {
@@ -27,8 +25,7 @@ public final class ModConfiguredFeatures {
 				6,   // maxFloors (multi-story: engine randomizes floors in [min,max] per building)
 				true, // foundation
 				2,   // groupMin
-				5,   // groupMax
-				24   // spacing (>footprint so streets have gaps to run through)
+				5    // groupMax
 		));
 	}
 

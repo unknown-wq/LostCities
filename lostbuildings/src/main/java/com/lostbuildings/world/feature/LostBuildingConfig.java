@@ -15,7 +15,6 @@ import java.util.List;
  * @param foundation whether to generate foundations under buildings
  * @param groupMin   minimum buildings per generated group
  * @param groupMax   maximum buildings per generated group
- * @param spacing    spacing (blocks) between building sites within a group
  */
 public record LostBuildingConfig(
 		List<String> buildings,
@@ -23,8 +22,7 @@ public record LostBuildingConfig(
 		int maxFloors,
 		boolean foundation,
 		int groupMin,
-		int groupMax,
-		int spacing
+		int groupMax
 ) implements FeatureConfiguration {
 	public static final Codec<LostBuildingConfig> CODEC = RecordCodecBuilder.create((instance) -> instance.group(
 			Codec.STRING.listOf().fieldOf("buildings").forGetter(LostBuildingConfig::buildings),
@@ -32,7 +30,6 @@ public record LostBuildingConfig(
 			Codec.INT.fieldOf("max_floors").orElse(6).forGetter(LostBuildingConfig::maxFloors),
 			Codec.BOOL.fieldOf("foundation").orElse(true).forGetter(LostBuildingConfig::foundation),
 			Codec.INT.fieldOf("group_min").orElse(2).forGetter(LostBuildingConfig::groupMin),
-			Codec.INT.fieldOf("group_max").orElse(5).forGetter(LostBuildingConfig::groupMax),
-			Codec.INT.fieldOf("spacing").orElse(24).forGetter(LostBuildingConfig::spacing)
+			Codec.INT.fieldOf("group_max").orElse(5).forGetter(LostBuildingConfig::groupMax)
 	).apply(instance, LostBuildingConfig::new));
 }
