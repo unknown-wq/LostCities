@@ -18,8 +18,21 @@ import net.minecraft.world.level.biome.Biomes;
  * {@code standard}, {@code standard_border}, {@code desert}, {@code outside}.
  *
  * <p><b>Sampling window.</b> During the FEATURES step a feature may only touch the origin chunk
- * ±1 chunk; reading a biome further out would hit a chunk that is not in the {@code WorldGenRegion}
- * and throw. Every probe offset below is therefore ≤16 blocks, which can never leave that window.
+ * ±1 chunk; reading a biome further out hits a chunk whose biomes have not been generated yet and
+ * throws {@code IllegalStateException: Requested chunk unavailable during world generation}.
+ *
+ * <p>Probes used to be expressed as ±16 <em>block</em> offsets from the raw feature origin, on the
+ * theory that ±16 blocks can never cross more than one chunk border. As block arithmetic that is
+ * true — but {@code BiomeManager.getBiome} does not read the position it is handed. It subtracts 2
+ * from each axis and then lets a seed-derived fuzz pick the next quart cell up, so the chunk it
+ * actually loads lies in {@code [(x - 2) >> 4, (x + 5) >> 4]}. A probe landing on a chunk's minimum
+ * block edge resolved into the <em>previous</em> chunk and one on the maximum edge into the next —
+ * two chunks out from the origin, and a crash. See {@link WorldGenBounds} for the full derivation.
+ *
+ * <p>Probes are therefore anchored on chunk <em>centres</em>: eight blocks of slack on every side,
+ * far more than the fuzz can consume, so every probe is safe by construction. Each one is still run
+ * past {@link WorldGenBounds#canSampleBiome} and skipped rather than trusted, because a probe that
+ * cannot be answered must not take chunk generation down with it.
  *
  * <p><b>Caveat.</b> The biome at the origin is normally {@code lostbuildings:lost_city} itself
  * (Biolith replaces a slice of the host biome, and the feature only runs inside the replacement),
@@ -40,11 +53,15 @@ public final class StyleSelector {
 	private static final TagKey<Biome> CONVENTIONAL_IS_DESERT =
 			TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath("c", "is_desert"));
 
-	/** Origin plus the 8 neighbours one chunk out. Fixed order ⇒ the result is seed-stable. */
-	private static final int[][] PROBES = {
+	/**
+	 * Origin chunk plus the 8 neighbours one chunk out, as <em>chunk</em> offsets. The order is
+	 * fixed and the geometry depends on nothing but the origin's chunk, so the style a given
+	 * position resolves to is stable for a given seed.
+	 */
+	private static final int[][] PROBE_CHUNKS = {
 			{0, 0},
-			{16, 0}, {-16, 0}, {0, 16}, {0, -16},
-			{16, 16}, {16, -16}, {-16, 16}, {-16, -16}
+			{1, 0}, {-1, 0}, {0, 1}, {0, -1},
+			{1, 1}, {1, -1}, {-1, 1}, {-1, -1}
 	};
 
 	private StyleSelector() {
@@ -52,15 +69,34 @@ public final class StyleSelector {
 
 	/** The style name to build this group from. Never null; falls back to {@link #DEFAULT_STYLE}. */
 	public static String select(WorldGenLevel level, BlockPos origin) {
+		int centerChunkX = WorldGenBounds.chunkOf(origin.getX());
+		int centerChunkZ = WorldGenBounds.chunkOf(origin.getZ());
 		BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
-		for (int[] offset : PROBES) {
-			probe.set(origin.getX() + offset[0], origin.getY(), origin.getZ() + offset[1]);
+		for (int[] column : probeColumns(centerChunkX, centerChunkZ)) {
+			if (!WorldGenBounds.canSampleBiome(level, column[0], column[1], centerChunkX, centerChunkZ)) {
+				continue;   // unreachable by construction; skipping beats throwing if it ever is not
+			}
+			probe.set(column[0], origin.getY(), column[1]);
 			String style = styleFor(level.getBiome(probe));
 			if (style != null) {
 				return style;
 			}
 		}
 		return DEFAULT_STYLE;
+	}
+
+	/**
+	 * The columns {@link #select} probes, in probe order: the centre block of the origin chunk
+	 * followed by the centres of its 8 neighbours. Pure geometry, so tests can assert both the
+	 * ordering (which fixes the style result) and that every column is a legal biome probe.
+	 */
+	static int[][] probeColumns(int centerChunkX, int centerChunkZ) {
+		int[][] columns = new int[PROBE_CHUNKS.length][2];
+		for (int i = 0; i < PROBE_CHUNKS.length; i++) {
+			columns[i][0] = WorldGenBounds.chunkCenterBlock(centerChunkX + PROBE_CHUNKS[i][0]);
+			columns[i][1] = WorldGenBounds.chunkCenterBlock(centerChunkZ + PROBE_CHUNKS[i][1]);
+		}
+		return columns;
 	}
 
 	/** Style for one biome, or null when the biome carries no opinion. */

@@ -60,6 +60,13 @@ public final class Foundation {
 				int wx = origin.getX() + dx;
 				int wz = origin.getZ() + dz;
 
+				// The whole column is read and written, so bound it once here instead of per block.
+				// With a chunk-aligned 16x16 site inside the write window this never skips anything;
+				// it is what keeps a wider footprint or a stray site from reaching out of the window.
+				if (!WorldGenBounds.canRead(level, cursor.set(wx, baseY, wz))) {
+					continue;
+				}
+
 				// 1) Pillar down: from just below the building base to the first solid block (or
 				//    the deepest limit). Water counts as replaceable, so a submerged site gets a
 				//    solid plinth rather than a house standing in a lake.

@@ -105,7 +105,8 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 			// solid ground, no terrain intrudes and no water is left inside.
 			if (config.foundation()) {
 				Foundation.build(level, site, FOOTPRINT, FOOTPRINT,
-						clearHeight(building, floors, cellTerrainTop(level, origin, wx, wz) - groundY),
+						clearHeight(building, floors,
+								cellTerrainTop(level, origin, wx, wz, centerCX, centerCZ) - groundY),
 						fillerState(building, pal, rand), settings.waterLevel(), rand);
 			}
 
@@ -120,16 +121,26 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 
 		// Connect the placed buildings with simple streets running through the gaps between
 		// footprints (§11b lightweight approach — not a city/street engine port).
-		Streets.connect(level, placedSites, FOOTPRINT, groundY, rand);
+		Streets.connect(level, placedSites, FOOTPRINT, groundY, centerCX, centerCZ, rand);
 		return true;
 	}
 
-	/** The subset of {@link CellLattice#OFFSETS} this group exclusively owns, in lattice order. */
+	/**
+	 * The subset of {@link CellLattice#OFFSETS} this group exclusively owns, in lattice order.
+	 *
+	 * <p>Cells outside the feature's write window are dropped rather than built: every position in
+	 * this class (site corners, terrain probes, streets) is derived from a cell, so this one filter
+	 * keeps the whole placement pass inside the window even if {@code OFFSETS} ever grows past ±1.
+	 */
 	private static List<int[]> ownedCells(long seed, int centerCX, int centerCZ) {
 		List<int[]> owned = new ArrayList<>(CellLattice.OFFSETS.length);
 		for (int i = 0; i < CellLattice.OFFSETS.length; i++) {
+			int[] offset = CellLattice.OFFSETS[i];
+			if (!WorldGenBounds.holdsChunk(centerCX + offset[0], centerCZ + offset[1], centerCX, centerCZ)) {
+				continue;
+			}
 			if (CellLattice.owns(seed, centerCX, centerCZ, i)) {
-				owned.add(CellLattice.OFFSETS[i]);
+				owned.add(offset);
 			}
 		}
 		return owned;
@@ -148,7 +159,8 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 			int wx = (centerCX + cell[0]) << 4;
 			int wz = (centerCZ + cell[1]) << 4;
 			for (int[] corner : CELL_PROBES) {
-				lowest = Math.min(lowest, terrainTop(level, origin, wx + corner[0], wz + corner[1]));
+				lowest = Math.min(lowest,
+						terrainTop(level, origin, wx + corner[0], wz + corner[1], centerCX, centerCZ));
 			}
 		}
 		if (lowest == Integer.MAX_VALUE) {
@@ -158,20 +170,42 @@ public class GroupBuildingPlacement implements BuildingPlacement {
 	}
 
 	/** Highest terrain point over one cell — how far the slope reaches into the building volume. */
-	private static int cellTerrainTop(WorldGenLevel level, BlockPos origin, int wx, int wz) {
+	private static int cellTerrainTop(WorldGenLevel level, BlockPos origin, int wx, int wz,
+	                                  int centerCX, int centerCZ) {
 		int highest = Integer.MIN_VALUE;
 		for (int[] corner : CELL_PROBES) {
-			highest = Math.max(highest, terrainTop(level, origin, wx + corner[0], wz + corner[1]));
+			highest = Math.max(highest,
+					terrainTop(level, origin, wx + corner[0], wz + corner[1], centerCX, centerCZ));
 		}
 		return highest;
 	}
 
-	private static int terrainTop(WorldGenLevel level, BlockPos origin, int x, int z) {
+	/**
+	 * Heightmap height of one column, with the column pulled back into the feature's write window
+	 * first (see {@link WorldGenBounds}).
+	 *
+	 * <p>Clamping rather than skipping is deliberate: callers fold these samples into a min or a max,
+	 * so dropping one would silently change the group's ground level, while nudging an out-of-window
+	 * column to the nearest legal one keeps the terrain estimate honest. With the shipped
+	 * {@link CellLattice#OFFSETS} (±1 cell) and {@link #CELL_PROBES} (0..15 blocks into a cell) the
+	 * clamp never fires — it exists so that widening either of those cannot reintroduce an
+	 * out-of-window read.
+	 */
+	private static int terrainTop(WorldGenLevel level, BlockPos origin, int x, int z,
+	                              int centerCX, int centerCZ) {
+		int safeX = WorldGenBounds.clampBlockToWindow(x, centerCX);
+		int safeZ = WorldGenBounds.clampBlockToWindow(z, centerCZ);
 		return level.getHeightmapPos(Heightmap.Types.WORLD_SURFACE_WG,
-				new BlockPos(x, origin.getY(), z)).getY();
+				new BlockPos(safeX, origin.getY(), safeZ)).getY();
 	}
 
-	/** Corners and centre of a 16x16 cell — enough to characterise the slope it sits on. */
+	/**
+	 * Corners and centre of a 16x16 cell — enough to characterise the slope it sits on.
+	 *
+	 * <p>{@code FOOTPRINT - 1} rather than {@code FOOTPRINT}: the far corner is the cell's last
+	 * block, not the first block of the next cell. Using {@code FOOTPRINT} would push probes on an
+	 * outer cell two chunks out from the generating chunk.
+	 */
 	private static final int[][] CELL_PROBES = {
 			{0, 0}, {FOOTPRINT - 1, 0}, {0, FOOTPRINT - 1}, {FOOTPRINT - 1, FOOTPRINT - 1},
 			{FOOTPRINT / 2, FOOTPRINT / 2}
