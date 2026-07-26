@@ -51,25 +51,30 @@ public final class BlockStates {
         if (block instanceof StructureVoidBlock) {
             return null;
         }
-        BlockState west = level.getBlockState(pos.west());
-        BlockState east = level.getBlockState(pos.east());
-        BlockState north = level.getBlockState(pos.north());
-        BlockState south = level.getBlockState(pos.south());
-
+        // Hot path: this runs for every block a building places, so bail out before touching the
+        // world for anything that has no connection state at all (that is ~99% of the blocks).
         if (block instanceof CrossCollisionBlock) {
-            state = state.setValue(CrossCollisionBlock.WEST, canAttach(west))
-                    .setValue(CrossCollisionBlock.EAST, canAttach(east))
-                    .setValue(CrossCollisionBlock.NORTH, canAttach(north))
-                    .setValue(CrossCollisionBlock.SOUTH, canAttach(south));
-        } else if (block instanceof WallBlock) {
-            state = state.setValue(WallBlock.WEST, canAttachWall(west))
-                    .setValue(WallBlock.EAST, canAttachWall(east))
-                    .setValue(WallBlock.NORTH, canAttachWall(north))
-                    .setValue(WallBlock.SOUTH, canAttachWall(south));
-        } else if (block instanceof StairBlock) {
-            state = state.setValue(StairBlock.SHAPE, getShapeProperty(level, state, pos));
+            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            return state.setValue(CrossCollisionBlock.WEST, canAttach(neighbour(level, m, pos, Direction.WEST)))
+                    .setValue(CrossCollisionBlock.EAST, canAttach(neighbour(level, m, pos, Direction.EAST)))
+                    .setValue(CrossCollisionBlock.NORTH, canAttach(neighbour(level, m, pos, Direction.NORTH)))
+                    .setValue(CrossCollisionBlock.SOUTH, canAttach(neighbour(level, m, pos, Direction.SOUTH)));
+        }
+        if (block instanceof WallBlock) {
+            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            return state.setValue(WallBlock.WEST, canAttachWall(neighbour(level, m, pos, Direction.WEST)))
+                    .setValue(WallBlock.EAST, canAttachWall(neighbour(level, m, pos, Direction.EAST)))
+                    .setValue(WallBlock.NORTH, canAttachWall(neighbour(level, m, pos, Direction.NORTH)))
+                    .setValue(WallBlock.SOUTH, canAttachWall(neighbour(level, m, pos, Direction.SOUTH)));
+        }
+        if (block instanceof StairBlock) {
+            return state.setValue(StairBlock.SHAPE, getShapeProperty(level, state, pos));
         }
         return state;
+    }
+
+    private static BlockState neighbour(WorldGenLevel level, BlockPos.MutableBlockPos m, BlockPos pos, Direction dir) {
+        return level.getBlockState(m.setWithOffset(pos, dir));
     }
 
     private static boolean isBlockStairs(BlockState state) {

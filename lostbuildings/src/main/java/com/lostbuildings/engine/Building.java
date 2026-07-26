@@ -28,7 +28,7 @@ public class Building {
     private final float prefersLonely;
 
     private Palette localPalette = null;
-    private String refPaletteName;
+    private final String refPaletteName;
 
     private final List<PartRef> parts = new ArrayList<>();
     private final List<PartRef> parts2 = new ArrayList<>();
@@ -46,9 +46,11 @@ public class Building {
         fillerBlock = object.getFillerBlock();
         rubbleBlock = object.getRubbleBlock();
         if (object.getLocalPalette() != null) {
-            localPalette = new Palette("__local__" + object.getRegistryName().getPath());
-            localPalette.parsePaletteArray(object.getLocalPalette(), variants);
-        } else if (object.getRefPaletteName() != null) {
+            Palette local = new Palette("__local__" + object.getRegistryName().getPath());
+            local.parsePaletteArray(object.getLocalPalette(), variants);
+            localPalette = local;
+            refPaletteName = null;
+        } else {
             refPaletteName = object.getRefPaletteName();
         }
         if (object.getParts() != null) {
@@ -67,10 +69,14 @@ public class Building {
         return name;
     }
 
-    public Palette getLocalPalette(Assets assets) {
+    /** Load-time pass: resolve a {@code refpalette} reference once, before the assets go live. */
+    void resolveLocalPalette(Assets assets) {
         if (localPalette == null && refPaletteName != null) {
             localPalette = assets.getPalette(DataTools.normalize(refPaletteName));
         }
+    }
+
+    public Palette getLocalPalette(Assets assets) {
         return localPalette;
     }
 

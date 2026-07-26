@@ -16,9 +16,7 @@ import net.minecraft.world.level.levelgen.placement.RarityFilter;
 public class ModPlacedFeatures {
 	public static final ResourceKey<PlacedFeature> LOST_BUILDING = createRegistryKey("lost_building");
 
-	@SuppressWarnings("UnnecessaryReturnStatement")
 	private ModPlacedFeatures() {
-		return;
 	}
 
 	public static void bootstrap(BootstrapContext<PlacedFeature> context) {

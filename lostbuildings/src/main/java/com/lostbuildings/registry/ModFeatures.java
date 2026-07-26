@@ -11,9 +11,7 @@ import net.minecraft.world.level.levelgen.feature.Feature;
 public class ModFeatures {
 	public static final Feature<LostBuildingConfig> LOST_BUILDING = new LostBuildingFeature(LostBuildingConfig.CODEC);
 
-	@SuppressWarnings("UnnecessaryReturnStatement")
 	private ModFeatures() {
-		return;
 	}
 
 	public static void init() {

@@ -1,0 +1,58 @@
+name: build
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: lostbuildings
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 25
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Build (compile + unit tests)
+        run: ./gradlew build --stacktrace
+
+      - name: Run datagen
+        run: ./gradlew runDatagen --stacktrace
+
+      - name: Datagen output must be committed
+        working-directory: .
+        run: |
+          if ! git diff --exit-code -- lostbuildings/src/main/generated; then
+            echo "::error::runDatagen produced changes that are not committed."
+            echo "Run './gradlew runDatagen' in lostbuildings/ and commit src/main/generated."
+            exit 1
+          fi
+          # Untracked files count as a diff too.
+          if [ -n "$(git status --porcelain -- lostbuildings/src/main/generated)" ]; then
+            echo "::error::runDatagen produced untracked files under src/main/generated."
+            git status --porcelain -- lostbuildings/src/main/generated
+            exit 1
+          fi
+
+      - name: Upload jar
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: lostbuildings-jar
+          path: lostbuildings/build/libs/*.jar
+          if-no-files-found: error

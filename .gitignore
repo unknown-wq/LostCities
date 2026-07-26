@@ -1,0 +1,11 @@
+# Built artifacts are never committed — releases are published on GitHub Releases and the
+# jar is reproducible from source with `cd lostbuildings && ./gradlew build`.
+dist/
+
+# Gradle / IDE leftovers that can appear at the repo root
+.gradle/
+build/
+*.class
+
+# Agent worktrees (transient)
+.claude/worktrees/

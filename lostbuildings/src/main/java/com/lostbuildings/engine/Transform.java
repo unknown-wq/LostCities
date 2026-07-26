@@ -47,26 +47,42 @@ public enum Transform {
         };
     }
 
+    /** 16x16 convenience overload — prefer {@link #rotateX(int, int, int, int)}. */
     public int rotateX(int x, int z) {
+        return rotateX(x, z, 16, 16);
+    }
+
+    /** 16x16 convenience overload — prefer {@link #rotateZ(int, int, int, int)}. */
+    public int rotateZ(int x, int z) {
+        return rotateZ(x, z, 16, 16);
+    }
+
+    /**
+     * Rotate a part-local x coordinate. The mirror axis is derived from the real part size: several
+     * parts are not 16x16 (building_front1/2/3 are 2-3 wide, stairs1/2 are 2 wide, stairsbig and
+     * stairsnormal are 6 wide) and the hardcoded {@code 15 - x} used to shove them out of place.
+     */
+    public int rotateX(int x, int z, int xSize, int zSize) {
         return switch (this) {
             case ROTATE_NONE -> x;
-            case ROTATE_90 -> 15 - z;
-            case ROTATE_180 -> 15 - x;
+            case ROTATE_90 -> (zSize - 1) - z;
+            case ROTATE_180 -> (xSize - 1) - x;
             case ROTATE_270 -> z;
-            case MIRROR_X -> 15 - x;
+            case MIRROR_X -> (xSize - 1) - x;
             case MIRROR_Z -> x;
             case MIRROR_90_X -> z;
         };
     }
 
-    public int rotateZ(int x, int z) {
+    /** Rotate a part-local z coordinate. See {@link #rotateX(int, int, int, int)}. */
+    public int rotateZ(int x, int z, int xSize, int zSize) {
         return switch (this) {
             case ROTATE_NONE -> z;
             case ROTATE_90 -> x;
-            case ROTATE_180 -> 15 - z;
-            case ROTATE_270 -> 15 - x;
+            case ROTATE_180 -> (zSize - 1) - z;
+            case ROTATE_270 -> (xSize - 1) - x;
             case MIRROR_X -> z;
-            case MIRROR_Z -> 15 - z;
+            case MIRROR_Z -> (zSize - 1) - z;
             case MIRROR_90_X -> x;
         };
     }

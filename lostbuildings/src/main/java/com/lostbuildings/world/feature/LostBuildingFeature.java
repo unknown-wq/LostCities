@@ -10,7 +10,7 @@ import net.minecraft.world.level.levelgen.feature.FeaturePlaceContext;
  * strategy so the registration/wiring (Agent A) is decoupled from the real placement (Agent C).
  */
 public class LostBuildingFeature extends Feature<LostBuildingConfig> {
-	/** Swapped to GroupBuildingPlacement by Agent D once the engine + data exist. */
+	/** Placement strategy; swappable so tests / future variants can substitute their own. */
 	public static BuildingPlacement PLACEMENT = new GroupBuildingPlacement();
 
 	public LostBuildingFeature(Codec<LostBuildingConfig> codec) {

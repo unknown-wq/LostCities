@@ -8,70 +8,90 @@ import net.minecraft.world.level.block.state.BlockState;
 
 /**
  * Foundation / terrain fitting for a placed building, analog of Lost Cities'
- * {@code LostCityTerrainFeature.fillToGround}. For each column of the building
- * footprint it (1) pillars solid fill down from the building base to the solid
- * ground surface so the house is never left floating, and (2) clears the volume
- * above the base (up to {@code clearHeight}) so intruding terrain / trees do not
- * poke through the house.
+ * {@code LostCityTerrainFeature.fillToGround}. For each column of the building footprint it
+ * <ol>
+ *   <li>pillars solid fill down from the building base to the solid ground surface so the house
+ *       is never left floating,</li>
+ *   <li>clears the volume above the base (up to {@code clearHeight}) so intruding terrain, trees
+ *       <em>and water</em> do not poke through the house, and</li>
+ *   <li>drains any remaining liquid inside the footprint up to sea level, so a house placed in
+ *       shallow water does not end up flooded from above.</li>
+ * </ol>
  *
- * <p>All writes use worldgen setBlock flags exactly as the sibling {@code desolation}
- * mod does (flag 19 for placed fill, flag 2 for clears — never flag 1, which would
- * trigger neighbour updates during worldgen).
+ * <p>All writes use {@link WorldGenFlags#SET_BLOCK}.
  */
 public final class Foundation {
 
-    private Foundation() {}
+	/** Used when the building's own filler block cannot be resolved from the palette. */
+	public static final BlockState DEFAULT_FILL = Blocks.COBBLESTONE.defaultBlockState();
 
-    /** Default fill block for the pillars under the footprint. */
-    private static final BlockState FILL = Blocks.COBBLESTONE.defaultBlockState();
-    private static final BlockState AIR = Blocks.AIR.defaultBlockState();
+	private static final BlockState AIR = Blocks.AIR.defaultBlockState();
+	/** How far below the building base a support pillar may reach before giving up. */
+	private static final int MAX_PILLAR_DEPTH = 32;
 
-    /**
-     * @param level       worldgen level
-     * @param origin      NW-bottom corner of the building footprint (building base Y)
-     * @param width       footprint size along X (blocks)
-     * @param length      footprint size along Z (blocks)
-     * @param clearHeight how many blocks above the base to clear of solid terrain
-     * @param rand        random source (unused reserved for jittered fill variety)
-     */
-    public static void build(WorldGenLevel level, BlockPos origin, int width, int length,
-                             int clearHeight, RandomSource rand) {
-        int baseY = origin.getY();
-        int minY = level.getMinY();
-        int deepest = Math.max(minY + 1, baseY - 32);
+	private Foundation() {
+	}
 
-        BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+	/**
+	 * @param level       worldgen level
+	 * @param origin      NW-bottom corner of the building footprint (building base Y)
+	 * @param width       footprint size along X (blocks)
+	 * @param length      footprint size along Z (blocks)
+	 * @param clearHeight how many blocks above the base to clear of terrain and liquid
+	 * @param fill        block the support pillars are made of — pass the building's own filler so
+	 *                    the plinth reads as part of the house instead of a cobblestone stump
+	 * @param waterLevel  sea level; liquid inside the footprint is drained at least up to here
+	 * @param rand        random source (reserved for jittered fill variety)
+	 */
+	public static void build(WorldGenLevel level, BlockPos origin, int width, int length,
+	                         int clearHeight, BlockState fill, int waterLevel, RandomSource rand) {
+		BlockState pillar = fill == null ? DEFAULT_FILL : fill;
+		int baseY = origin.getY();
+		int deepest = Math.max(level.getMinY() + 1, baseY - MAX_PILLAR_DEPTH);
+		int clearTop = Math.min(level.getMaxY(), baseY + clearHeight);
+		// Drain at least up to sea level even when the building itself is shorter than the water
+		// column above it — otherwise the cleared interior refills from the top (bug B10).
+		int drainTop = Math.min(level.getMaxY(), Math.max(clearTop, waterLevel + 1));
 
-        for (int dx = 0; dx < width; dx++) {
-            for (int dz = 0; dz < length; dz++) {
-                int wx = origin.getX() + dx;
-                int wz = origin.getZ() + dz;
+		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
-                // 1) Pillar down: from just below the building base to the first solid
-                //    block (or the deepest limit). Border columns and interior columns
-                //    are both filled so the house sits on a solid pad.
-                int y = baseY - 1;
-                cursor.set(wx, y, wz);
-                while (y > deepest && isReplaceable(level.getBlockState(cursor))) {
-                    level.setBlock(cursor, FILL, 19);
-                    y--;
-                    cursor.set(wx, y, wz);
-                }
+		for (int dx = 0; dx < width; dx++) {
+			for (int dz = 0; dz < length; dz++) {
+				int wx = origin.getX() + dx;
+				int wz = origin.getZ() + dz;
 
-                // 2) Clear above: remove any solid terrain that intrudes into the
-                //    building volume (e.g. a hillside cutting through the house).
-                for (int cy = baseY; cy < baseY + clearHeight; cy++) {
-                    cursor.set(wx, cy, wz);
-                    BlockState state = level.getBlockState(cursor);
-                    if (!state.isAir() && !state.liquid()) {
-                        level.setBlock(cursor, AIR, 2);
-                    }
-                }
-            }
-        }
-    }
+				// 1) Pillar down: from just below the building base to the first solid block (or
+				//    the deepest limit). Water counts as replaceable, so a submerged site gets a
+				//    solid plinth rather than a house standing in a lake.
+				int y = baseY - 1;
+				cursor.set(wx, y, wz);
+				while (y > deepest && isReplaceable(level.getBlockState(cursor))) {
+					level.setBlock(cursor, pillar, WorldGenFlags.SET_BLOCK);
+					y--;
+					cursor.set(wx, y, wz);
+				}
 
-    private static boolean isReplaceable(BlockState state) {
-        return state.isAir() || state.liquid() || state.canBeReplaced();
-    }
+				// 2) Clear the building volume: hillsides, trees AND liquids all go. Liquids used
+				//    to be skipped here, which is exactly why buildings generated flooded.
+				for (int cy = baseY; cy < clearTop; cy++) {
+					cursor.set(wx, cy, wz);
+					if (!level.getBlockState(cursor).isAir()) {
+						level.setBlock(cursor, AIR, WorldGenFlags.SET_BLOCK);
+					}
+				}
+
+				// 3) Above the building, remove liquid only (never carve terrain) up to sea level.
+				for (int cy = clearTop; cy < drainTop; cy++) {
+					cursor.set(wx, cy, wz);
+					if (level.getBlockState(cursor).liquid()) {
+						level.setBlock(cursor, AIR, WorldGenFlags.SET_BLOCK);
+					}
+				}
+			}
+		}
+	}
+
+	private static boolean isReplaceable(BlockState state) {
+		return state.isAir() || state.liquid() || state.canBeReplaced();
+	}
 }

@@ -19,9 +19,7 @@ import net.minecraft.world.level.levelgen.placement.PlacedFeature;
  * Shape mirrors desolation's BiomeCreator (26.2 EnvironmentAttributes API).
  */
 public class LostCityBiomeCreator {
-	@SuppressWarnings("UnnecessaryReturnStatement")
 	private LostCityBiomeCreator() {
-		return;
 	}
 
 	public static Biome createLostCity(BootstrapContext<Biome> context) {
@@ -54,6 +52,15 @@ public class LostCityBiomeCreator {
 		BiomeDefaultFeatures.addDefaultSoftDisks(generationSettings);
 		BiomeDefaultFeatures.addDefaultSprings(generationSettings);
 
+		// Surface life. Without these the biome is a bald wasteland: no grass, no flowers, no
+		// trees at all. Same set vanilla plains uses, so a lost_city patch blends into the
+		// plains / forest / savanna it replaces instead of reading as a scorched hole.
+		BiomeDefaultFeatures.addPlainGrass(generationSettings);
+		BiomeDefaultFeatures.addDefaultFlowers(generationSettings);
+		BiomeDefaultFeatures.addPlainVegetation(generationSettings);
+		BiomeDefaultFeatures.addDefaultMushrooms(generationSettings);
+		BiomeDefaultFeatures.addDefaultExtraVegetation(generationSettings, true);
+
 		// The Lost Buildings feature itself.
 		generationSettings.addFeature(GenerationStep.Decoration.SURFACE_STRUCTURES, ModPlacedFeatures.LOST_BUILDING);
 
@@ -62,6 +69,9 @@ public class LostCityBiomeCreator {
 
 	private static MobSpawnSettings createSpawnSettings() {
 		MobSpawnSettings.Builder spawnSettings = new MobSpawnSettings.Builder();
+		// Passive animals first (cows/sheep/pigs/chickens), then the common ambient + monster set.
+		// commonSpawns() alone left the biome without a single peaceful mob.
+		BiomeDefaultFeatures.farmAnimals(spawnSettings);
 		BiomeDefaultFeatures.commonSpawns(spawnSettings);
 		return spawnSettings.build();
 	}

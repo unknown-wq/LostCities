@@ -23,11 +23,13 @@ public class BuildingPart implements IBuildingPart {
     private final int xSize;
     private final int zSize;
 
-    // Optimized version organized as xSize*zSize vertical strings
-    private char[][] vslices = null;
+    // Optimized version organized as xSize*zSize vertical strings. Built eagerly in the constructor:
+    // the old lazy version published the array before filling it, so a second worldgen thread could
+    // read a half-initialised table and get null slices (holes in walls).
+    private final char[][] vslices;
 
     private Palette localPalette = null;
-    private String refPaletteName;
+    private final String refPaletteName;
 
     private final Map<String, Object> metadata = new HashMap<>();
 
@@ -37,11 +39,14 @@ public class BuildingPart implements IBuildingPart {
         zSize = object.getzSize();
         slices = object.getSlices();
         if (object.getLocalPalette() != null) {
-            localPalette = new Palette("__local__" + name.getPath());
-            localPalette.parsePaletteArray(object.getLocalPalette(), variants);
-        } else if (object.getRefPaletteName() != null) {
+            Palette local = new Palette("__local__" + name.getPath());
+            local.parsePaletteArray(object.getLocalPalette(), variants);
+            localPalette = local;
+            refPaletteName = null;
+        } else {
             refPaletteName = object.getRefPaletteName();
         }
+        vslices = buildVslices();
         if (object.getMetadata() != null) {
             for (PartMeta meta : object.getMetadata()) {
                 String key = meta.key();
@@ -99,45 +104,47 @@ public class BuildingPart implements IBuildingPart {
         return name;
     }
 
+    private char[][] buildVslices() {
+        char[][] result = new char[xSize * zSize][];
+        for (int x = 0; x < xSize; x++) {
+            for (int z = 0; z < zSize; z++) {
+                StringBuilder vs = new StringBuilder();
+                boolean empty = true;
+                for (int y = 0; y < slices.length; y++) {
+                    char c = getC(x, y, z);
+                    vs.append(c);
+                    if (c != ' ') {
+                        empty = false;
+                    }
+                }
+                result[z * xSize + x] = empty ? null : vs.toString().toCharArray();
+            }
+        }
+        return result;
+    }
+
     /**
      * Vertical slices, organized by z*xSize+x.
      */
     @Override
     public char[][] getVslices() {
-        if (vslices == null) {
-            vslices = new char[xSize * zSize][];
-            for (int x = 0; x < xSize; x++) {
-                for (int z = 0; z < zSize; z++) {
-                    StringBuilder vs = new StringBuilder();
-                    boolean empty = true;
-                    for (int y = 0; y < slices.length; y++) {
-                        Character c = getC(x, y, z);
-                        vs.append(c);
-                        if (c != ' ') {
-                            empty = false;
-                        }
-                    }
-                    if (empty) {
-                        vslices[z * xSize + x] = null;
-                    } else {
-                        vslices[z * xSize + x] = vs.toString().toCharArray();
-                    }
-                }
-            }
-        }
         return vslices;
     }
 
     @Override
     public char[] getVSlice(int x, int z) {
-        return getVslices()[z * xSize + x];
+        return vslices[z * xSize + x];
+    }
+
+    /** Load-time pass: resolve a {@code refpalette} reference once, before the assets go live. */
+    void resolveLocalPalette(Assets assets) {
+        if (localPalette == null && refPaletteName != null) {
+            localPalette = assets.getPalette(DataTools.normalize(refPaletteName));
+        }
     }
 
     @Override
     public Palette getLocalPalette(Assets assets) {
-        if (localPalette == null && refPaletteName != null) {
-            localPalette = assets.getPalette(DataTools.normalize(refPaletteName));
-        }
         return localPalette;
     }
 
