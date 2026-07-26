@@ -9,12 +9,17 @@ import net.minecraft.world.level.biome.Biomes;
  * desolation's DesolationBiolithGeneration (replaceOverworld on a couple of vanilla biomes).
  */
 public class BiolithGeneration {
-	/** Fraction of the targeted vanilla biome replaced with lost_city. */
-	private static final double LOST_CITY_CHANCE = 0.15D;
+	/**
+	 * Fraction of the targeted vanilla biome replaced with lost_city.
+	 *
+	 * <p>Kept low on purpose: buildings are only attempted in roughly 1 chunk in 20 inside the
+	 * biome ({@code ModPlacedFeatures} rarity filter), so a high replacement chance mostly buys
+	 * repainted biome map rather than content. At 0.05 a twentieth of plains/forest/savanna
+	 * carries the biome instead of nearly a sixth.
+	 */
+	private static final double LOST_CITY_CHANCE = 0.05D;
 
-	@SuppressWarnings("UnnecessaryReturnStatement")
 	private BiolithGeneration() {
-		return;
 	}
 
 	public static void init() {
