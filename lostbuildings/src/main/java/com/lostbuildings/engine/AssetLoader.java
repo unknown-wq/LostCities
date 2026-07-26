@@ -2,6 +2,7 @@ package com.lostbuildings.engine;
 
 import com.google.gson.JsonElement;
 import com.google.gson.JsonParser;
+import com.lostbuildings.LostBuildings;
 import com.lostbuildings.engine.codec.BuildingPartRE;
 import com.lostbuildings.engine.codec.BuildingRE;
 import com.lostbuildings.engine.codec.ConditionRE;
@@ -17,6 +18,7 @@ import net.minecraft.server.packs.resources.ResourceManager;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.function.BiConsumer;
 
 /**
@@ -31,45 +33,56 @@ public class AssetLoader {
 
     public static Assets load(ResourceManager rm) {
         Assets assets = new Assets();
+        // Number of assets skipped in this call (broken JSON, bad codec data, ...).
+        AtomicInteger failed = new AtomicInteger();
 
         // Variants first (palettes/parts/buildings resolve variant references against them).
-        forEach(rm, "variants", VariantRE.CODEC, (name, re) -> {
+        forEach(rm, failed, "variants", VariantRE.CODEC, (name, re) -> {
             re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
             assets.putVariant(name, re);
         });
         Map<String, VariantRE> variants = assets.getVariants();
 
-        forEach(rm, "palettes", PaletteRE.CODEC, (name, re) -> {
+        forEach(rm, failed, "palettes", PaletteRE.CODEC, (name, re) -> {
             re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
             Palette palette = new Palette(Identifier.fromNamespaceAndPath(ROOT, name));
             palette.parsePaletteArray(re, variants);
             assets.putPalette(name, palette);
         });
 
-        forEach(rm, "parts", BuildingPartRE.CODEC, (name, re) -> {
+        forEach(rm, failed, "parts", BuildingPartRE.CODEC, (name, re) -> {
             re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
             assets.putPart(name, new BuildingPart(re, variants));
         });
 
-        forEach(rm, "buildings", BuildingRE.CODEC, (name, re) -> {
+        forEach(rm, failed, "buildings", BuildingRE.CODEC, (name, re) -> {
             re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
             assets.putBuilding(name, new Building(re, variants));
         });
 
-        forEach(rm, "conditions", ConditionRE.CODEC, (name, re) -> {
+        forEach(rm, failed, "conditions", ConditionRE.CODEC, (name, re) -> {
             re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
             assets.putCondition(name, re);
         });
 
-        forEach(rm, "styles", StyleRE.CODEC, (name, re) -> {
+        forEach(rm, failed, "styles", StyleRE.CODEC, (name, re) -> {
             re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
             assets.putStyle(name, new Style(re));
         });
 
+        // Resolve every deferred refpalette now, while we are still single-threaded, so the assets
+        // are effectively immutable by the time worldgen touches them.
+        assets.resolveReferences();
+
+        LostBuildings.LOGGER.info(
+                "[lostbuildings] Assets loaded: {} variants, {} palettes, {} parts, {} buildings, {} conditions, {} styles ({} file(s) skipped due to errors)",
+                assets.getVariants().size(), assets.getPalettes().size(), assets.getParts().size(),
+                assets.getBuildings().size(), assets.getConditions().size(), assets.getStyles().size(), failed.get());
+
         return assets;
     }
 
-    private static <T> void forEach(ResourceManager rm, String category, Codec<T> codec, BiConsumer<String, T> consumer) {
+    private static <T> void forEach(ResourceManager rm, AtomicInteger failed, String category, Codec<T> codec, BiConsumer<String, T> consumer) {
         String directory = ROOT + "/" + category;
         Map<Identifier, Resource> resources = rm.listResources(directory,
                 id -> id.getNamespace().equals(MODID) && id.getPath().endsWith(".json"));
@@ -81,7 +94,10 @@ public class AssetLoader {
                 T value = codec.parse(JsonOps.INSTANCE, json).getOrThrow();
                 consumer.accept(name, value);
             } catch (IOException | RuntimeException e) {
-                throw new RuntimeException("Failed to load Lost Cities asset '" + id + "'!", e);
+                // A single broken file (quite possibly from somebody else's datapack) must not stop
+                // the server from starting: log it and carry on without that asset.
+                failed.incrementAndGet();
+                LostBuildings.LOGGER.error("[lostbuildings] Failed to load asset '{}' - skipping it", id, e);
             }
         }
     }

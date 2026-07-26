@@ -18,7 +18,26 @@ public class Style {
 
     public Style(StyleRE object) {
         this.name = object.getRegistryName();
-        this.randomPaletteChoices = object.getRandomPaletteChoices();
+        this.randomPaletteChoices = object.getRandomPaletteChoices() == null
+                ? List.of() : List.copyOf(object.getRandomPaletteChoices());
+    }
+
+    private Style(Identifier name, List<List<PaletteSelector>> randomPaletteChoices) {
+        this.name = name;
+        this.randomPaletteChoices = randomPaletteChoices;
+    }
+
+    /**
+     * A style with no palette choices. Used as a last-resort fallback so that a missing/misspelled
+     * style name degrades into "a building with an empty palette" (plus a warning) instead of an
+     * NPE inside chunk generation.
+     */
+    public static Style empty(String name) {
+        Identifier id = Identifier.tryParse(name);
+        if (id == null) {
+            id = Identifier.fromNamespaceAndPath("lostbuildings", "missing_style");
+        }
+        return new Style(id, List.of());
     }
 
     public String getName() {

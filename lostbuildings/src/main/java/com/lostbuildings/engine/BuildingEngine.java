@@ -1,31 +1,29 @@
 package com.lostbuildings.engine;
 
+import com.lostbuildings.LostBuildings;
 import com.lostbuildings.engine.codec.ConditionPart;
 import com.lostbuildings.engine.codec.ConditionRE;
 import com.lostbuildings.engine.codec.PaletteSelector;
 import com.lostbuildings.engine.util.Tools;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
-import net.minecraft.resources.ResourceKey;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.CrossCollisionBlock;
 import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.WallBlock;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
-import net.minecraft.world.level.block.entity.RandomizableContainerBlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.storage.loot.LootTable;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * The building-generation engine: builds compiled palettes from a style and generates the block
@@ -39,11 +37,41 @@ public class BuildingEngine {
     // Worldgen-safe flags: notify clients, do not trigger neighbour updates (bit 1 must stay off).
     private static final int SET_FLAGS = Block.UPDATE_CLIENTS;
 
+    // net.minecraft.world.RandomizableContainer.LOOT_TABLE_TAG / LOOT_TABLE_SEED_TAG (26.2).
+    private static final String LOOT_TABLE_TAG = "LootTable";
+    private static final String LOOT_TABLE_SEED_TAG = "LootTableSeed";
+
     private final Assets assets;
-    private final Map<Block, BlockEntityType<?>> typeCache = new HashMap<>();
+    // Worldgen runs on many threads: every cache below has to be concurrent.
+    private final Map<Block, BlockEntityType<?>> typeCache = new ConcurrentHashMap<>();
+
+    /**
+     * Compiled palettes keyed by the exact set of source palettes they were merged from. Compiling
+     * is not cheap and the same style/building/part combinations recur for every single building.
+     */
+    private final Map<List<Palette>, CompiledPalette> paletteCache = new ConcurrentHashMap<>();
+    private final Map<DerivedPaletteKey, CompiledPalette> derivedPaletteCache = new ConcurrentHashMap<>();
+
+    /** Deduplication for one-shot warnings (unknown palette characters, bad loot ids, ...). */
+    private final Set<String> warned = ConcurrentHashMap.newKeySet();
+
+    /** A base compiled palette overlaid with one extra (building- or part-local) palette. */
+    private record DerivedPaletteKey(CompiledPalette base, Palette extra) {
+    }
 
     public BuildingEngine(Assets assets) {
         this.assets = assets;
+    }
+
+    private void warnOnce(String key, String message) {
+        if (warned.add(key)) {
+            LostBuildings.LOGGER.warn("[lostbuildings] {}", message);
+        }
+    }
+
+    private CompiledPalette derive(CompiledPalette base, Palette extra) {
+        return derivedPaletteCache.computeIfAbsent(new DerivedPaletteKey(base, extra),
+                k -> new CompiledPalette(k.base(), k.extra()));
     }
 
     /**
@@ -51,6 +79,10 @@ public class BuildingEngine {
      * is chosen (weighted by factor) and all chosen palettes are merged.
      */
     public CompiledPalette buildPalette(Assets a, RandomSource rand, Style style) {
+        if (style == null) {
+            warnOnce("nullstyle", "buildPalette() called with a null style - using an empty palette");
+            style = Style.empty("<null>");
+        }
         List<Palette> chosen = new ArrayList<>();
         for (List<PaletteSelector> group : style.getRandomPaletteChoices()) {
             if (group.isEmpty()) {
@@ -65,7 +97,10 @@ public class BuildingEngine {
                 chosen.add(palette);
             }
         }
-        return new CompiledPalette(chosen.toArray(new Palette[0]));
+        // Key on the identity of the chosen palettes: List.equals/hashCode fall through to Palette's
+        // identity equals, which is exactly the "set of selected palettes" key we want.
+        return paletteCache.computeIfAbsent(List.copyOf(chosen),
+                key -> new CompiledPalette(key.toArray(new Palette[0])));
     }
 
     /**
@@ -77,7 +112,7 @@ public class BuildingEngine {
         CompiledPalette palette = pal;
         Palette buildingPalette = b.getLocalPalette(assets);
         if (buildingPalette != null) {
-            palette = new CompiledPalette(pal, buildingPalette);
+            palette = derive(pal, buildingPalette);
         }
 
         int floors = pickFloors(b, rand, s);
@@ -116,16 +151,14 @@ public class BuildingEngine {
     private int pickFloors(Building b, RandomSource rand, PlaceSettings s) {
         int min = s.minFloors();
         int max = s.maxFloors();
-        if (b.getOverrideFloors() != null && b.getOverrideFloors() && b.getMinFloors() >= 0 && b.getMaxFloors() >= 0) {
+        // A building that declares its own floor limits wins over the feature config. Intersecting
+        // the two ranges instead produced nonsense for buildings that only fit at one height
+        // (e.g. "cabin" with minfloors=maxfloors=1 came out as a 2-3 storey stack).
+        if (b.getMinFloors() >= 0) {
             min = b.getMinFloors();
+        }
+        if (b.getMaxFloors() >= 0) {
             max = b.getMaxFloors();
-        } else {
-            if (b.getMinFloors() >= 0) {
-                min = Math.max(min, b.getMinFloors());
-            }
-            if (b.getMaxFloors() >= 0) {
-                max = Math.min(max, b.getMaxFloors());
-            }
         }
         if (max < min) {
             max = min;
@@ -142,22 +175,28 @@ public class BuildingEngine {
         CompiledPalette compiledPalette = basePalette;
         Palette partPalette = part.getLocalPalette(assets);
         if (partPalette != null) {
-            compiledPalette = new CompiledPalette(basePalette, partPalette);
+            compiledPalette = derive(basePalette, partPalette);
         }
 
-        for (int x = 0; x < part.getXSize(); x++) {
-            for (int z = 0; z < part.getZSize(); z++) {
+        int xSize = part.getXSize();
+        int zSize = part.getZSize();
+        for (int x = 0; x < xSize; x++) {
+            for (int z = 0; z < zSize; z++) {
                 char[] vs = part.getVSlice(x, z);
                 if (vs == null) {
                     continue;
                 }
-                int rx = ox + transform.rotateX(x, z);
-                int rz = oz + transform.rotateZ(x, z);
+                int rx = ox + transform.rotateX(x, z, xSize, zSize);
+                int rz = oz + transform.rotateZ(x, z, xSize, zSize);
                 for (int y = 0; y < vs.length; y++) {
                     char c = vs[y];
-                    BlockState b = compiledPalette.get(c);
+                    BlockState b = compiledPalette.get(c, rand);
                     if (b == null) {
-                        throw new RuntimeException("Could not find entry '" + c + "' in the palette for part '" + part.getName() + "'!");
+                        // A broken/foreign datapack must not kill chunk generation: warn once per
+                        // (part, character) and treat the cell as air (= leave the world untouched).
+                        warnOnce("palette:" + part.getName() + ":" + c,
+                                "Could not find entry '" + c + "' in the palette for part '" + part.getName() + "' - using air");
+                        continue;
                     }
                     if (transform != Transform.ROTATE_NONE) {
                         b = b.rotate(transform.getMcRotation());
@@ -180,8 +219,11 @@ public class BuildingEngine {
                                 continue;   // no spawners -> leave empty
                             }
                             handleSpawner(level, pos, inf.mobId(), rand);
-                        } else if (inf.tag() != null) {
-                            handleBlockEntity(level, pos, b, inf);
+                        } else {
+                            String loot = (s.loot() && inf.loot() != null && !inf.loot().isEmpty()) ? inf.loot() : null;
+                            if (inf.tag() != null || loot != null) {
+                                handleBlockEntity(level, pos, b, inf.tag(), loot, rand);
+                            }
                         }
                     }
 
@@ -194,10 +236,6 @@ public class BuildingEngine {
                     Block cb = corrected.getBlock();
                     if (cb instanceof CrossCollisionBlock || cb instanceof WallBlock || cb instanceof StairBlock) {
                         connectables.add(pos.immutable());
-                    }
-
-                    if (inf != null && inf.loot() != null && !inf.loot().isEmpty() && s.loot()) {
-                        handleLoot(level, pos, inf.loot(), rand);
                     }
                 }
             }
@@ -225,19 +263,19 @@ public class BuildingEngine {
         level.getChunk(pos).setBlockEntityNbt(tag);
     }
 
-    private void handleLoot(WorldGenLevel level, BlockPos pos, String lootCondition, RandomSource rand) {
-        String lootTable = resolveCondition(lootCondition, rand);
-        if (lootTable == null) {
-            return;
-        }
-        BlockEntity be = level.getBlockEntity(pos);
-        if (be instanceof RandomizableContainerBlockEntity container) {
-            ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE, Identifier.parse(lootTable));
-            container.setLootTable(key);
-        }
-    }
-
-    private void handleBlockEntity(WorldGenLevel level, BlockPos pos, BlockState b, Palette.Info inf) {
+    /**
+     * Write the pending block-entity NBT for a position. During the FEATURES step the chunk is still
+     * a {@code ProtoChunk} and {@link WorldGenLevel#getBlockEntity} returns {@code null} there, so
+     * the data has to go through {@code ChunkAccess.setBlockEntityNbt} — it is applied when the
+     * chunk is promoted and the real block entity is created.
+     *
+     * <p>The loot table is stored the way {@code RandomizableContainer.tryLoadLootTable} reads it
+     * back in 26.2: {@code "LootTable"} (a plain resource-location string, decoded with
+     * {@code LootTable.KEY_CODEC}) and {@code "LootTableSeed"} (a long; 0 means "roll a fresh random
+     * seed on first open", so a seed derived from the worldgen random is written for determinism).
+     */
+    private void handleBlockEntity(WorldGenLevel level, BlockPos pos, BlockState b,
+                                   @Nullable CompoundTag extra, @Nullable String lootCondition, RandomSource rand) {
         BlockEntityType<?> type = getTypeForBlock(b);
         if (type == null) {
             return;
@@ -246,7 +284,19 @@ public class BuildingEngine {
         if (typeKey == null) {
             return;
         }
-        CompoundTag tag = inf.tag().copy();
+        CompoundTag tag = extra == null ? new CompoundTag() : extra.copy();
+        if (lootCondition != null) {
+            String lootTable = resolveCondition(lootCondition, rand);
+            if (lootTable != null && !lootTable.isEmpty()) {
+                Identifier lootId = Identifier.tryParse(lootTable);
+                if (lootId == null) {
+                    warnOnce("loottable:" + lootTable, "Invalid loot table id '" + lootTable + "' - ignored");
+                } else {
+                    tag.putString(LOOT_TABLE_TAG, lootId.toString());
+                    tag.putLong(LOOT_TABLE_SEED_TAG, rand.nextLong());
+                }
+            }
+        }
         tag.putInt("x", pos.getX());
         tag.putInt("y", pos.getY());
         tag.putInt("z", pos.getZ());
