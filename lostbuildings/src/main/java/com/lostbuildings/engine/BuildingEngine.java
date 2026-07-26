@@ -5,6 +5,7 @@ import com.lostbuildings.engine.codec.ConditionPart;
 import com.lostbuildings.engine.codec.ConditionRE;
 import com.lostbuildings.engine.codec.PaletteSelector;
 import com.lostbuildings.engine.util.Tools;
+import com.lostbuildings.world.feature.WorldGenBounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -223,6 +224,12 @@ public class BuildingEngine {
                     }
 
                     BlockPos pos = origin.offset(rx, oy + y, rz);
+                    // Shipped parts are 16x16 and sites are chunk-aligned inside the write window,
+                    // so this never fires — but a datapack part wider than a chunk would otherwise
+                    // read and write outside the window, and the region logs both.
+                    if (!WorldGenBounds.canRead(level, pos)) {
+                        continue;
+                    }
                     Palette.Info inf = compiledPalette.getInfo(c);
 
                     if (inf != null) {

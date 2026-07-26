@@ -1,5 +1,6 @@
 package com.lostbuildings.engine;
 
+import com.lostbuildings.world.feature.WorldGenBounds;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Block;
@@ -17,6 +18,20 @@ import net.minecraft.core.Direction;
  * Common block states and per-block "connectable state" correction. Connection flags for
  * fences/panes/bars/walls and the shape of stairs are derived from the blocks already present in
  * the world.
+ *
+ * <p><b>Neighbour reads are bounded.</b> A pane or wall sitting on the outer edge of a building
+ * looks one block further out, and for a building placed in one of the outer cells of the lattice
+ * that block is two chunks from the chunk being generated — outside the FEATURES write window (see
+ * {@link WorldGenBounds}). Minecraft logged an unsafe-read warning for every one of those, and
+ * every shipped part that puts glass or a fence on its footprint border produced hundreds of them
+ * per building across the two correction passes.
+ *
+ * <p>Such a neighbour is treated as <b>air, i.e. "no connection"</b>. Nothing is lost by that: a
+ * chunk two out is only guaranteed to have reached {@code STRUCTURE_STARTS}, so it holds no terrain
+ * and certainly no neighbouring building — there was never anything there to connect to. How much
+ * further along it happens to be depends on which chunks the server is generating in parallel, so
+ * reading it was not only unsafe but non-reproducible; answering with a constant makes the result
+ * independent of generation order and therefore deterministic.
  */
 public final class BlockStates {
 
@@ -73,8 +88,21 @@ public final class BlockStates {
         return state;
     }
 
+    /**
+     * The block one step in {@code dir}, or {@link #AIR} when that block is outside the window the
+     * worldgen region will answer for. See the class javadoc for why air is the correct answer.
+     */
     private static BlockState neighbour(WorldGenLevel level, BlockPos.MutableBlockPos m, BlockPos pos, Direction dir) {
-        return level.getBlockState(m.setWithOffset(pos, dir));
+        m.setWithOffset(pos, dir);
+        if (!WorldGenBounds.canRead(level, m)) {
+            return AIR;
+        }
+        return level.getBlockState(m);
+    }
+
+    /** {@link #neighbour(WorldGenLevel, BlockPos.MutableBlockPos, BlockPos, Direction)} without a reusable cursor. */
+    private static BlockState neighbour(WorldGenLevel level, BlockPos pos, Direction dir) {
+        return neighbour(level, new BlockPos.MutableBlockPos(), pos, dir);
     }
 
     private static boolean isBlockStairs(BlockState state) {
@@ -82,7 +110,7 @@ public final class BlockStates {
     }
 
     private static boolean isDifferentStairs(WorldGenLevel level, BlockState state, BlockPos pos, Direction face) {
-        BlockState blockstate = level.getBlockState(pos.relative(face));
+        BlockState blockstate = neighbour(level, pos, face);
         return !isBlockStairs(blockstate)
                 || blockstate.getValue(StairBlock.FACING) != state.getValue(StairBlock.FACING)
                 || blockstate.getValue(StairBlock.HALF) != state.getValue(StairBlock.HALF);
@@ -90,7 +118,7 @@ public final class BlockStates {
 
     private static StairsShape getShapeProperty(WorldGenLevel level, BlockState state, BlockPos pos) {
         Direction direction = state.getValue(StairBlock.FACING);
-        BlockState blockstate = level.getBlockState(pos.relative(direction));
+        BlockState blockstate = neighbour(level, pos, direction);
         if (isBlockStairs(blockstate) && state.getValue(StairBlock.HALF) == blockstate.getValue(StairBlock.HALF)) {
             Direction direction1 = blockstate.getValue(StairBlock.FACING);
             if (direction1.getAxis() != state.getValue(StairBlock.FACING).getAxis()
@@ -102,7 +130,7 @@ public final class BlockStates {
             }
         }
 
-        BlockState blockstate1 = level.getBlockState(pos.relative(direction.getOpposite()));
+        BlockState blockstate1 = neighbour(level, pos, direction.getOpposite());
         if (isBlockStairs(blockstate1) && state.getValue(StairBlock.HALF) == blockstate1.getValue(StairBlock.HALF)) {
             Direction direction2 = blockstate1.getValue(StairBlock.FACING);
             if (direction2.getAxis() != state.getValue(StairBlock.FACING).getAxis()

@@ -50,10 +50,13 @@ public final class Streets {
 	 * @param footprint footprint size in blocks (square)
 	 * @param groundY   the group's shared ground level (building base Y); the road surface is the
 	 *                  block below it, so roads and ground floors are flush
+	 * @param centerCX  chunk X of the chunk being generated — the road may not leave it by more than
+	 *                  {@link WorldGenBounds#WRITE_RADIUS}
+	 * @param centerCZ  chunk Z of the chunk being generated
 	 * @param rand      random source (reserved; unused for now)
 	 */
 	public static void connect(WorldGenLevel level, List<BlockPos> sites, int footprint, int groundY,
-	                           RandomSource rand) {
+	                           int centerCX, int centerCZ, RandomSource rand) {
 		if (sites.size() < 2) {
 			return;
 		}
@@ -64,36 +67,42 @@ public final class Streets {
 			int ax = a.getX() + half, az = a.getZ() + half;
 			int bx = b.getX() + half, bz = b.getZ() + half;
 			// L-shaped route: X leg at z=az, then Z leg at x=bx.
-			layLegX(level, ax, bx, az, sites, footprint, groundY);
-			layLegZ(level, az, bz, bx, sites, footprint, groundY);
+			layLegX(level, ax, bx, az, sites, footprint, groundY, centerCX, centerCZ);
+			layLegZ(level, az, bz, bx, sites, footprint, groundY, centerCX, centerCZ);
 		}
 	}
 
 	/** Lay a road segment along X from x0..x1 at fixed z, HALF_WIDTH blocks each side (widened on z). */
 	private static void layLegX(WorldGenLevel level, int x0, int x1, int z, List<BlockPos> sites,
-	                            int footprint, int groundY) {
+	                            int footprint, int groundY, int centerCX, int centerCZ) {
 		int lo = Math.min(x0, x1), hi = Math.max(x0, x1);
 		for (int x = lo; x <= hi; x++) {
 			for (int w = -HALF_WIDTH; w <= HALF_WIDTH; w++) {
-				paveColumn(level, x, z + w, sites, footprint, groundY);
+				paveColumn(level, x, z + w, sites, footprint, groundY, centerCX, centerCZ);
 			}
 		}
 	}
 
 	/** Lay a road segment along Z from z0..z1 at fixed x, HALF_WIDTH blocks each side (widened on x). */
 	private static void layLegZ(WorldGenLevel level, int z0, int z1, int x, List<BlockPos> sites,
-	                            int footprint, int groundY) {
+	                            int footprint, int groundY, int centerCX, int centerCZ) {
 		int lo = Math.min(z0, z1), hi = Math.max(z0, z1);
 		for (int z = lo; z <= hi; z++) {
 			for (int w = -HALF_WIDTH; w <= HALF_WIDTH; w++) {
-				paveColumn(level, x + w, z, sites, footprint, groundY);
+				paveColumn(level, x + w, z, sites, footprint, groundY, centerCX, centerCZ);
 			}
 		}
 	}
 
 	/** Pave one column at the group's shared level: surface block, headroom above, fill below. */
 	private static void paveColumn(WorldGenLevel level, int x, int z, List<BlockPos> sites,
-	                               int footprint, int groundY) {
+	                               int footprint, int groundY, int centerCX, int centerCZ) {
+		// Route legs run between cell centres and are widened by HALF_WIDTH, so with the shipped
+		// lattice (cells ±1, half-width 1) a column is always inside the write window. Dropping the
+		// odd column that is not beats a heightmap read the region logs and a write it discards.
+		if (!WorldGenBounds.holdsBlock(x, z, centerCX, centerCZ)) {
+			return;
+		}
 		if (insideAnyFootprint(x, z, sites, footprint)) {
 			return; // never carve a road through a building footprint
 		}
