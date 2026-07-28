@@ -1,6 +1,5 @@
 package com.lostbuildings.world.biome;
 
-import com.lostbuildings.world.feature.ModPlacedFeatures;
 import net.minecraft.core.HolderGetter;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.data.worldgen.BiomeDefaultFeatures;
@@ -10,7 +9,6 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.BiomeGenerationSettings;
 import net.minecraft.world.level.biome.BiomeSpecialEffects;
 import net.minecraft.world.level.biome.MobSpawnSettings;
-import net.minecraft.world.level.levelgen.GenerationStep;
 import net.minecraft.world.level.levelgen.carver.ConfiguredWorldCarver;
 import net.minecraft.world.level.levelgen.placement.PlacedFeature;
 
@@ -61,8 +59,11 @@ public class LostCityBiomeCreator {
 		BiomeDefaultFeatures.addDefaultMushrooms(generationSettings);
 		BiomeDefaultFeatures.addDefaultExtraVegetation(generationSettings, true);
 
-		// The Lost Buildings feature itself.
-		generationSettings.addFeature(GenerationStep.Decoration.SURFACE_STRUCTURES, ModPlacedFeatures.LOST_BUILDING);
+		// No mod feature is added here any more. Buildings arrive through the
+		// lostbuildings:lost_city *structure* (see world/structure/), which the biome opts into by
+		// carrying the #lostbuildings:has_structure/lost_city tag rather than by listing a feature:
+		// structures are collected in the structure_starts step and written chunk by chunk, which is
+		// what lifted the 48x48 write window the feature was confined to.
 
 		return generationSettings.build();
 	}

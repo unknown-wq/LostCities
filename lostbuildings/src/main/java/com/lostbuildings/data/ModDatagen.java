@@ -10,6 +10,7 @@ public class ModDatagen implements DataGeneratorEntrypoint {
 		FabricDataGenerator.Pack pack = dataGenerator.createPack();
 
 		pack.addProvider(ModDynamicRegistryProvider::new);
+		pack.addProvider(ModBiomeTagProvider::new);
 	}
 
 	@Override

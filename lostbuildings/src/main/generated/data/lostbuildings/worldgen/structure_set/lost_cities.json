@@ -1,0 +1,14 @@
+{
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 274470681,
+    "separation": 6,
+    "spacing": 10
+  },
+  "structures": [
+    {
+      "structure": "lostbuildings:lost_city",
+      "weight": 1
+    }
+  ]
+}
