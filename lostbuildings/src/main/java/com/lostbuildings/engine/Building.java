@@ -4,6 +4,8 @@ import com.lostbuildings.engine.codec.BuildingRE;
 import com.lostbuildings.engine.codec.DataTools;
 import com.lostbuildings.engine.codec.PartRef;
 import com.lostbuildings.engine.codec.VariantRE;
+import com.lostbuildings.engine.condition.ConditionContext;
+import com.lostbuildings.engine.condition.ConditionMatcher;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import org.jetbrains.annotations.Nullable;
@@ -122,43 +124,14 @@ public class Building {
     }
 
     /**
-     * Simplified condition test. Only the vertical-position conditions relevant to intact
-     * standalone buildings are evaluated (top / ground / cellar / floor / range). Other
-     * conditions (inpart, inbuilding, inbiome, chunkx/z, belowpart, issphere, isbuilding) are
-     * treated as satisfied.
+     * Pick a part for a position. Conditions are evaluated by {@link ConditionMatcher}, which since
+     * wave 2 honours {@code inpart}/{@code inbuilding}/{@code chunkx}/{@code chunkz}/{@code
+     * issphere} as well as the vertical ones; see that class for what is still treated as satisfied.
      */
-    private static boolean matches(PartRef ref, boolean isTop, boolean isGround, boolean isCellar, int floor) {
-        if (ref.getTop() != null && ref.getTop() != isTop) {
-            return false;
-        }
-        if (ref.getGround() != null && ref.getGround() != isGround) {
-            return false;
-        }
-        if (ref.getCellar() != null && ref.getCellar() != isCellar) {
-            return false;
-        }
-        if (ref.getFloor() != null && ref.getFloor() != floor) {
-            return false;
-        }
-        if (ref.getRange() != null) {
-            String[] split = ref.getRange().split(",");
-            try {
-                int l1 = Integer.parseInt(split[0].trim());
-                int l2 = Integer.parseInt(split[1].trim());
-                if (floor < l1 || floor > l2) {
-                    return false;
-                }
-            } catch (NumberFormatException | ArrayIndexOutOfBoundsException e) {
-                // Ignore malformed ranges
-            }
-        }
-        return true;
-    }
-
-    private static String pick(List<PartRef> list, RandomSource random, boolean isTop, boolean isGround, boolean isCellar, int floor) {
+    private static String pick(List<PartRef> list, RandomSource random, ConditionContext ctx) {
         List<String> partNames = new ArrayList<>();
         for (PartRef ref : list) {
-            if (matches(ref, isTop, isGround, isCellar, floor)) {
+            if (ConditionMatcher.matches(ref, ctx)) {
                 partNames.add(ref.getPart());
             }
         }
@@ -168,11 +141,39 @@ public class Building {
         return partNames.get(random.nextInt(partNames.size()));
     }
 
+    /**
+     * Position-aware part selection (the wave-2 form). The context knows the storey, the building's
+     * top storey and its cellar count, so a cellar or a top floor is asked for honestly rather than
+     * described by three loose booleans.
+     */
+    public String getRandomPart(RandomSource random, ConditionContext ctx) {
+        return pick(parts, random, ctx);
+    }
+
+    public String getRandomPart2(RandomSource random, ConditionContext ctx) {
+        return pick(parts2, random, ctx);
+    }
+
+    /**
+     * Pre-wave-2 form, kept so nothing outside the engine has to change. The booleans are folded
+     * back into a {@link ConditionContext}: {@code isCellar} is expressed as a negative storey and
+     * {@code isTop} by declaring the current storey to be the top one.
+     */
     public String getRandomPart(RandomSource random, boolean isTop, boolean isGround, boolean isCellar, int floor) {
-        return pick(parts, random, isTop, isGround, isCellar, floor);
+        return pick(parts, random, contextFor(isTop, isGround, isCellar, floor));
     }
 
     public String getRandomPart2(RandomSource random, boolean isTop, boolean isGround, boolean isCellar, int floor) {
-        return pick(parts2, random, isTop, isGround, isCellar, floor);
+        return pick(parts2, random, contextFor(isTop, isGround, isCellar, floor));
+    }
+
+    private ConditionContext contextFor(boolean isTop, boolean isGround, boolean isCellar, int floor) {
+        int f = floor;
+        if (isCellar && f >= 0) {
+            f = -1 - f;
+        } else if (isGround) {
+            f = 0;
+        }
+        return new ConditionContext(f, isTop ? f : f + 1, isCellar ? 1 : 0, null, getName(), 0, 0, null);
     }
 }

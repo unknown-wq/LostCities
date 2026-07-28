@@ -5,10 +5,13 @@ import com.google.gson.JsonParser;
 import com.lostbuildings.LostBuildings;
 import com.lostbuildings.engine.codec.BuildingPartRE;
 import com.lostbuildings.engine.codec.BuildingRE;
+import com.lostbuildings.engine.codec.CityStyleRE;
 import com.lostbuildings.engine.codec.ConditionRE;
+import com.lostbuildings.engine.codec.MultiBuildingRE;
 import com.lostbuildings.engine.codec.PaletteRE;
 import com.lostbuildings.engine.codec.StyleRE;
 import com.lostbuildings.engine.codec.VariantRE;
+import com.lostbuildings.engine.codec.WorldStyleRE;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.JsonOps;
 import net.minecraft.resources.Identifier;
@@ -23,8 +26,13 @@ import java.util.function.BiConsumer;
 
 /**
  * Loads all Lost Cities building assets from the resource manager. Assets live under
- * data/lostbuildings/lostcities/{variants,palettes,parts,buildings,conditions,styles}/*.json
- * and are decoded with the RE codecs. This replaces the Forge datapack-registry mechanism.
+ * data/lostbuildings/lostcities/{variants,palettes,parts,buildings,conditions,styles,
+ * multibuildings,citystyles,worldstyles}/*.json and are decoded with the RE codecs. This replaces
+ * the Forge datapack-registry mechanism.
+ *
+ * <p>The last three directories are the wave-2 addition (PORT #9 / #1). They may legitimately be
+ * empty — nothing in the engine requires a city style to exist — so a world with no city styles
+ * loads and generates exactly as before.
  */
 public class AssetLoader {
 
@@ -70,14 +78,34 @@ public class AssetLoader {
             assets.putStyle(name, new Style(re));
         });
 
-        // Resolve every deferred refpalette now, while we are still single-threaded, so the assets
-        // are effectively immutable by the time worldgen touches them.
+        // City-level assets (PORT #9 / #1). These directories are allowed to be empty: they are
+        // filled by agent G in wave 2 and nothing in the engine requires them to exist.
+        forEach(rm, failed, "multibuildings", MultiBuildingRE.CODEC, (name, re) -> {
+            re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
+            assets.putMultiBuilding(name, re);
+        });
+
+        forEach(rm, failed, "citystyles", CityStyleRE.CODEC, (name, re) -> {
+            re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
+            assets.putCityStyle(name, re);
+        });
+
+        forEach(rm, failed, "worldstyles", WorldStyleRE.CODEC, (name, re) -> {
+            re.setRegistryName(Identifier.fromNamespaceAndPath(ROOT, name));
+            assets.putWorldStyle(name, re);
+        });
+
+        // Resolve every deferred refpalette and flatten the city-style inheritance chains now, while
+        // we are still single-threaded, so the assets are effectively immutable by the time worldgen
+        // touches them.
         assets.resolveReferences();
 
         LostBuildings.LOGGER.info(
-                "[lostbuildings] Assets loaded: {} variants, {} palettes, {} parts, {} buildings, {} conditions, {} styles ({} file(s) skipped due to errors)",
+                "[lostbuildings] Assets loaded: {} variants, {} palettes, {} parts, {} buildings, {} conditions, {} styles, {} citystyles, {} worldstyles, {} multibuildings ({} file(s) skipped due to errors)",
                 assets.getVariants().size(), assets.getPalettes().size(), assets.getParts().size(),
-                assets.getBuildings().size(), assets.getConditions().size(), assets.getStyles().size(), failed.get());
+                assets.getBuildings().size(), assets.getConditions().size(), assets.getStyles().size(),
+                assets.getCityStyles().size(), assets.getWorldStyles().size(), assets.getMultiBuildings().size(),
+                failed.get());
 
         return assets;
     }
