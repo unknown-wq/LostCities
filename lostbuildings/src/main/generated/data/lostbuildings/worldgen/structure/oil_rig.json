@@ -1,0 +1,13 @@
+{
+  "type": "lostbuildings:scattered",
+  "biomes": "#lostbuildings:has_structure/oil_rig",
+  "foundation": false,
+  "height_offset": 1,
+  "max_height_diff": 255,
+  "multi_buildings": [
+    "oilrig"
+  ],
+  "over_water": true,
+  "spawn_overrides": {},
+  "step": "surface_structures"
+}

@@ -33,6 +33,15 @@ import java.util.function.BiConsumer;
  * <p>The last three directories are the wave-2 addition (PORT #9 / #1). They may legitimately be
  * empty — nothing in the engine requires a city style to exist — so a world with no city styles
  * loads and generates exactly as before.
+ *
+ * <p><b>What is actually consulted (wave 3).</b> {@code multibuildings/} is the source of truth for
+ * the quadrants of a 2×2 landmark ({@code LostCityConfig.quadrantOf}), and {@code citystyles/}
+ * decides which palette style a city is built from ({@code StyleSelector.styleOfCityStyle}).
+ * {@code worldstyles/} is <b>loaded but not consulted</b>: everything in it is either expressed
+ * elsewhere in this port (city frequency is a vanilla {@code StructureSet}, the scattered table is
+ * the {@code scattered} / {@code oil_rig} structures) or belongs to the phase-4 systems (subway,
+ * highways, city spheres). It is parsed so that the format stays honest and so phase 4 has the data
+ * ready — do not add code that reads it without first deciding it beats the datapack path.
  */
 public class AssetLoader {
 

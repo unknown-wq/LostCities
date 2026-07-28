@@ -1,0 +1,18 @@
+{
+  "placement": {
+    "type": "minecraft:random_spread",
+    "salt": 274475523,
+    "separation": 5,
+    "spacing": 12
+  },
+  "structures": [
+    {
+      "structure": "lostbuildings:scattered",
+      "weight": 4
+    },
+    {
+      "structure": "lostbuildings:oil_rig",
+      "weight": 1
+    }
+  ]
+}

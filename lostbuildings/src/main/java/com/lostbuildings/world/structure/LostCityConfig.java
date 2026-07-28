@@ -1,5 +1,9 @@
 package com.lostbuildings.world.structure;
 
+import com.lostbuildings.LostBuildings;
+import com.lostbuildings.engine.Assets;
+import com.lostbuildings.engine.PlaceSettings;
+import com.lostbuildings.engine.codec.MultiBuildingRE;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -7,6 +11,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Datapack-facing knobs of the {@code lostbuildings:lost_city} structure (IMPROVEMENTS #10).
@@ -32,7 +38,12 @@ import java.util.List;
  *                     gives 3×3 buildings, {@code 9} gives 5×5. Keep
  *                     {@code ModStructureSets.CITY_SEPARATION >= citySize} or two cities can overlap.
  * @param density      chance a non-central building cell is actually built
- * @param cellars      storeys dug below the ground floor (handed straight to the building engine)
+ * @param cellars      storeys dug below the ground floor, {@code 0..}{@link PlaceSettings#MAX_CELLARS}
+ *                     (handed straight to the building engine). Wave 2 left the codec accepting up to
+ *                     4 while the engine clamped to 2, so 3 and 4 silently became 2; the bound is now
+ *                     the engine's own constant, and a datapack asking for more is rejected when it
+ *                     loads instead of quietly building something else. PHASE3-PLAN §5.3 ("1–2 storeys
+ *                     down") is what decided which of the two numbers won.
  * @param damageChance how badly buildings are ruined, {@code 0} = intact (handed to the engine)
  * @param streets      paving, street furniture and bridges
  * @param content      parks and the 2×2 landmark building
@@ -87,7 +98,7 @@ public record LostCityConfig(
 	 *
 	 * @param parks          {@code park_*} parts a park cell may be built from
 	 * @param parkChance     chance a building cell becomes a park instead
-	 * @param multiBuildings quadrant-name prefixes of the 2×2 landmark buildings
+	 * @param multiBuildings names of {@code multibuildings/*.json} entries usable as the landmark
 	 * @param downtownChance chance a city is a downtown and gets a landmark at its centre
 	 */
 	public record ContentSettings(List<String> parks, float parkChance,
@@ -99,16 +110,16 @@ public record LostCityConfig(
 				"park_fountain1", "park_fountain2");
 
 		/**
-		 * The shipped 2×2 landmarks. These are the {@code multibuildings/} entries whose four
+		 * The shipped 2×2 landmarks — names of files in
+		 * {@code data/lostbuildings/lostcities/multibuildings/}. These are the entries whose four
 		 * quadrants are real, distinct buildings: {@code center} (the antenna tower),
 		 * {@code library}, {@code shopping} / {@code shopping_open} (the mall with its atrium) and
-		 * {@code town} (the town hall — its multibuilding file is called {@code townhall}, but its
-		 * quadrants are {@code town00}..{@code town11}, and it is the quadrants that are named
-		 * here). {@code multi1..multi5} and {@code huge1/2} are left out on purpose: those tables
-		 * repeat one ordinary building four or nine times, which the single-cell path already does.
+		 * {@code townhall}. {@code multi1..multi5} and {@code huge1/2} are left out on purpose:
+		 * those tables repeat one ordinary building four or nine times, which the single-cell path
+		 * already does.
 		 */
 		public static final List<String> DEFAULT_MULTI_BUILDINGS = List.of(
-				"center", "library", "shopping", "shopping_open", "town");
+				"center", "library", "shopping", "shopping_open", "townhall");
 
 		public static final MapCodec<ContentSettings> MAP_CODEC = RecordCodecBuilder.mapCodec(instance -> instance.group(
 				Codec.STRING.listOf().optionalFieldOf("parks", DEFAULT_PARKS).forGetter(ContentSettings::parks),
@@ -129,7 +140,7 @@ public record LostCityConfig(
 			Codec.BOOL.optionalFieldOf("foundation", true).forGetter(LostCityConfig::foundation),
 			Codec.intRange(1, 16).optionalFieldOf("city_size", 9).forGetter(LostCityConfig::citySize),
 			Codec.floatRange(0.0F, 1.0F).optionalFieldOf("density", 0.85F).forGetter(LostCityConfig::density),
-			Codec.intRange(0, 4).optionalFieldOf("cellars", 1).forGetter(LostCityConfig::cellars),
+			Codec.intRange(0, PlaceSettings.MAX_CELLARS).optionalFieldOf("cellars", 1).forGetter(LostCityConfig::cellars),
 			Codec.floatRange(0.0F, 1.0F).optionalFieldOf("damage_chance", 0.2F).forGetter(LostCityConfig::damageChance),
 			StreetSettings.MAP_CODEC.codec().optionalFieldOf("streets", StreetSettings.defaults()).forGetter(LostCityConfig::streets),
 			ContentSettings.MAP_CODEC.codec().optionalFieldOf("content", ContentSettings.defaults()).forGetter(LostCityConfig::content)
@@ -186,21 +197,51 @@ public record LostCityConfig(
 	}
 
 	/**
-	 * The building name of one quadrant of a 2×2 landmark. The original stored these as a table in
-	 * {@code multibuildings/*.json} indexed {@code [x][z]}; every shipped table is simply the prefix
-	 * with the two indices appended, which is what this reproduces without needing the table loaded.
+	 * The building name of one quadrant of a 2×2 landmark.
 	 *
 	 * @param index    which landmark, modulo the configured list
 	 * @param quadrant {@code x * 2 + z}, as carried in {@link CityLayout.Cell#variant()}
 	 */
 	public String multiBuildingName(int index, int quadrant) {
-		String prefix = pick(content.multiBuildings(), index);
-		if (prefix.isEmpty()) {
+		return quadrantOf(pick(content.multiBuildings(), index), quadrant);
+	}
+
+	/**
+	 * One quadrant of a named multi-building, read out of {@code multibuildings/&lt;name&gt;.json}.
+	 *
+	 * <p><b>Wave 3 — one source of truth.</b> Wave 2 had two representations of a landmark: the
+	 * engine loaded {@code multibuildings/*.json} into {@link Assets} through {@code MultiBuildingRE},
+	 * while the city path went past it and rebuilt the quadrant name from a prefix plus the two
+	 * indices. Both happened to agree because every shipped table is named that way, but only one of
+	 * them is datapack-editable, so the convention was deleted and this — the loaded table — is what
+	 * runs. A datapack can now assemble a landmark out of any four buildings it likes.
+	 *
+	 * <p>Returns {@code ""} when the table is missing or too small; {@code BuildingPiece} treats an
+	 * unknown building as "place nothing" rather than aborting the chunk.
+	 *
+	 * @param quadrant {@code x * 2 + z}
+	 */
+	public static String quadrantOf(String multiBuildingName, int quadrant) {
+		if (multiBuildingName == null || multiBuildingName.isEmpty()) {
 			return "";
 		}
+		Assets assets = LostBuildings.ASSETS;
+		MultiBuildingRE table = assets == null ? null : assets.getMultiBuilding(multiBuildingName);
 		int q = Math.floorMod(quadrant, 4);
-		return prefix + (q / 2) + (q % 2);
+		String name = table == null ? null : table.getBuilding(q / 2, q % 2);
+		if (name == null || name.isEmpty()) {
+			if (assets != null && REPORTED_MISSING_MULTI_BUILDINGS.add(multiBuildingName)) {
+				LostBuildings.LOGGER.warn(
+						"[lostbuildings] Multi-building '{}' is not loaded (or has no 2x2 table) - no landmark will be placed for it",
+						multiBuildingName);
+			}
+			return "";
+		}
+		return name;
 	}
+
+	/** Multi-buildings already reported as missing, so the warning is logged once, not per city. */
+	private static final Set<String> REPORTED_MISSING_MULTI_BUILDINGS = ConcurrentHashMap.newKeySet();
 
 	private static String pick(List<String> names, int index) {
 		if (names.isEmpty()) {

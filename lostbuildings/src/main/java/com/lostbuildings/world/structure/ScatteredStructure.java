@@ -54,8 +54,8 @@ public class ScatteredStructure extends Structure {
 	 * Datapack knobs of a scattered structure.
 	 *
 	 * @param buildings      single-chunk buildings this structure may place
-	 * @param multiBuildings 2×2 landmark prefixes it may place instead (see
-	 *                       {@link LostCityConfig#multiBuildingName(int, int)} for the naming rule)
+	 * @param multiBuildings names of {@code multibuildings/*.json} entries it may place instead (see
+	 *                       {@link LostCityConfig#quadrantOf(String, int)})
 	 * @param heightOffset   blocks the building is moved up (positive) or down (negative) from the
 	 *                       measured site level; the shipped cabin and radiotower sink 3 blocks in so
 	 *                       their plinths are buried, the oil rig stands 1 above the waves
@@ -129,9 +129,6 @@ public class ScatteredStructure extends Structure {
 		BlockPos centre = new BlockPos(origin.getMiddleBlockX(), groundY, origin.getMiddleBlockZ());
 		Holder<Biome> biome = biomeAt(context, centre);
 		String style = StyleSelector.styleFor(biome);
-		if (style == null) {
-			style = StyleSelector.DEFAULT_STYLE;
-		}
 		StyleSelector.Climate climate = StyleSelector.climateFor(biome);
 		int floors = this.config.floors();
 		boolean foundation = this.config.foundation();
@@ -139,11 +136,12 @@ public class ScatteredStructure extends Structure {
 
 		return Optional.of(new Structure.GenerationStub(centre, builder -> {
 			if (multi) {
-				String prefix = this.config.multiBuildings().get(option - this.config.buildings().size());
+				String landmark = this.config.multiBuildings().get(option - this.config.buildings().size());
 				for (int dx = 0; dx <= 1; dx++) {
 					for (int dz = 0; dz <= 1; dz++) {
 						builder.addPiece(new BuildingPiece(origin.x() + dx, origin.z() + dz, groundY,
-								prefix + dx + dz, chosenStyle, floors, 0, foundation, 0, 0.0F,
+								LostCityConfig.quadrantOf(landmark, dx * 2 + dz), chosenStyle,
+								floors, 0, foundation, 0, 0.0F,
 								CityLayout.BuildingKind.RESIDENTIAL, climate));
 					}
 				}

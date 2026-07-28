@@ -1,0 +1,13 @@
+{
+  "type": "lostbuildings:scattered",
+  "biomes": "#lostbuildings:has_structure/scattered",
+  "buildings": [
+    "cabin",
+    "radiotower"
+  ],
+  "height_offset": -3,
+  "max_height_diff": 3,
+  "spawn_overrides": {},
+  "step": "surface_structures",
+  "terrain_adaptation": "beard_thin"
+}

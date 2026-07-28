@@ -203,12 +203,11 @@ public class LostCityStructure extends Structure {
 	 *
 	 * <p>Sampled from the biome <em>source</em> rather than from the level: at start-assembly time
 	 * there is no world to read, and sampling once at the centre is also what keeps every building
-	 * of a city in one palette. The biome→style table itself lives in
+	 * of a city in one palette. The biome→city style→style chain lives in
 	 * {@link StyleSelector#styleFor} — that file stays the single point of entry for styling.
 	 */
 	private static String resolveStyle(Holder<Biome> biome) {
-		String style = StyleSelector.styleFor(biome);
-		return style == null ? StyleSelector.DEFAULT_STYLE : style;
+		return StyleSelector.styleFor(biome);
 	}
 
 	/**

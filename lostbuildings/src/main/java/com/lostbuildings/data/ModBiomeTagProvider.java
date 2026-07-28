@@ -25,6 +25,13 @@ import java.util.concurrent.CompletableFuture;
  *       biomes without naming a single biome by hand;</li>
  *   <li>{@code oil_rig} — deep ocean only, the one place the shipped rig makes sense.</li>
  * </ul>
+ *
+ * <p><b>Why the vanilla tags go in as {@code addOptionalTag}.</b> {@code TagsProvider} verifies every
+ * tag reference against the tags <em>this</em> provider generates plus its parent provider's, and a
+ * mod's tag provider has no vanilla parent — so a plain {@code addTag(BiomeTags.IS_FOREST)} fails
+ * datagen with "missing following references" even though the tag obviously exists at runtime.
+ * Optional references are the standard way out: they emit {@code "required": false}, and since every
+ * one of these is a vanilla tag that is always loaded, the resolved biome set is identical.
  */
 public class ModBiomeTagProvider extends FabricTagsProvider<Biome> {
 
@@ -37,19 +44,19 @@ public class ModBiomeTagProvider extends FabricTagsProvider<Biome> {
 		builder(ModStructureTags.HAS_LOST_CITY).add(ModBiomes.LOST_CITY);
 
 		builder(ModStructureTags.HAS_SCATTERED)
-				.addTag(BiomeTags.IS_FOREST)
-				.addTag(BiomeTags.IS_TAIGA)
-				.addTag(BiomeTags.IS_JUNGLE)
-				.addTag(BiomeTags.IS_SAVANNA)
-				.addTag(BiomeTags.IS_BADLANDS)
-				.addTag(BiomeTags.IS_HILL)
-				.addTag(BiomeTags.IS_MOUNTAIN)
-				.addTag(BiomeTags.HAS_VILLAGE_PLAINS)
-				.addTag(BiomeTags.HAS_VILLAGE_DESERT)
-				.addTag(BiomeTags.HAS_VILLAGE_SAVANNA)
-				.addTag(BiomeTags.HAS_VILLAGE_SNOWY)
-				.addTag(BiomeTags.HAS_VILLAGE_TAIGA);
+				.addOptionalTag(BiomeTags.IS_FOREST)
+				.addOptionalTag(BiomeTags.IS_TAIGA)
+				.addOptionalTag(BiomeTags.IS_JUNGLE)
+				.addOptionalTag(BiomeTags.IS_SAVANNA)
+				.addOptionalTag(BiomeTags.IS_BADLANDS)
+				.addOptionalTag(BiomeTags.IS_HILL)
+				.addOptionalTag(BiomeTags.IS_MOUNTAIN)
+				.addOptionalTag(BiomeTags.HAS_VILLAGE_PLAINS)
+				.addOptionalTag(BiomeTags.HAS_VILLAGE_DESERT)
+				.addOptionalTag(BiomeTags.HAS_VILLAGE_SAVANNA)
+				.addOptionalTag(BiomeTags.HAS_VILLAGE_SNOWY)
+				.addOptionalTag(BiomeTags.HAS_VILLAGE_TAIGA);
 
-		builder(ModStructureTags.HAS_OIL_RIG).addTag(BiomeTags.IS_DEEP_OCEAN);
+		builder(ModStructureTags.HAS_OIL_RIG).addOptionalTag(BiomeTags.IS_DEEP_OCEAN);
 	}
 }

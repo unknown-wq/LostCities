@@ -1,2 +1,4 @@
 // 26.2	-999999999-01-01T00:00:00	Lost Buildings/Tags for minecraft:worldgen/biome
 7ffefe39c2c0a76c6698e4f8b13348a9a018dd7a data/lostbuildings/tags/worldgen/biome/has_structure/lost_city.json
+f3c201e369f6a0e56383145338df5f6e096b4890 data/lostbuildings/tags/worldgen/biome/has_structure/oil_rig.json
+b8584e5b1461a0d4e1baca66cad48068c032120f data/lostbuildings/tags/worldgen/biome/has_structure/scattered.json
