@@ -19,10 +19,17 @@ import net.minecraft.world.level.levelgen.structure.TerrainAdjustment;
  */
 public final class ModStructures {
 
-	public static final ResourceKey<Structure> LOST_CITY = ResourceKey.create(Registries.STRUCTURE,
-			Identifier.fromNamespaceAndPath(LostBuildings.MOD_ID, "lost_city"));
+	public static final ResourceKey<Structure> LOST_CITY = key("lost_city");
+	/** Cabins and radio towers, on land (PORT #2). */
+	public static final ResourceKey<Structure> SCATTERED = key("scattered");
+	/** The oil rig — the only structure in the mod that stands in open water (PORT #2). */
+	public static final ResourceKey<Structure> OIL_RIG = key("oil_rig");
 
 	private ModStructures() {
+	}
+
+	private static ResourceKey<Structure> key(String name) {
+		return ResourceKey.create(Registries.STRUCTURE, Identifier.fromNamespaceAndPath(LostBuildings.MOD_ID, name));
 	}
 
 	public static void bootstrap(BootstrapContext<Structure> context) {
@@ -33,9 +40,25 @@ public final class ModStructures {
 						.generationStep(GenerationStep.Decoration.SURFACE_STRUCTURES)
 						// NONE, not BEARD_*: the city does its own terrain fitting in Foundation
 						// (pillar down, excavate up), which is the behaviour the feature had and
-						// which wave 1 is explicitly not allowed to change.
+						// which the migration was explicitly not allowed to change.
 						.terrainAdapation(TerrainAdjustment.NONE)
 						.build(),
 				LostCityConfig.defaults()));
+
+		context.register(SCATTERED, new ScatteredStructure(
+				new Structure.StructureSettings.Builder(biomes.getOrThrow(ModStructureTags.HAS_SCATTERED))
+						.generationStep(GenerationStep.Decoration.SURFACE_STRUCTURES)
+						// A lone hut on a hillside is exactly what vanilla's beard was made for, and
+						// unlike a city it has no shared ground level that the beard could contradict.
+						.terrainAdapation(TerrainAdjustment.BEARD_THIN)
+						.build(),
+				ScatteredStructure.ScatteredConfig.land()));
+
+		context.register(OIL_RIG, new ScatteredStructure(
+				new Structure.StructureSettings.Builder(biomes.getOrThrow(ModStructureTags.HAS_OIL_RIG))
+						.generationStep(GenerationStep.Decoration.SURFACE_STRUCTURES)
+						.terrainAdapation(TerrainAdjustment.NONE)
+						.build(),
+				ScatteredStructure.ScatteredConfig.ocean()));
 	}
 }

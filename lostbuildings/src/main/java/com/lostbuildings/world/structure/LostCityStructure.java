@@ -2,7 +2,9 @@ package com.lostbuildings.world.structure;
 
 import com.lostbuildings.registry.ModStructureTypes;
 import com.lostbuildings.world.feature.StyleSelector;
+import com.lostbuildings.world.structure.piece.BridgePiece;
 import com.lostbuildings.world.structure.piece.BuildingPiece;
+import com.lostbuildings.world.structure.piece.ParkPiece;
 import com.lostbuildings.world.structure.piece.StreetPiece;
 import com.mojang.serialization.MapCodec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
@@ -39,7 +41,10 @@ import java.util.Optional;
  *       the world (no chunk needs to exist yet), and snapped to a storey boundary so floors line up
  *       between neighbours;</li>
  *   <li>the city's style, sampled once from the biome source at the centre, so a city is not built
- *       half in sandstone.</li>
+ *       half in sandstone;</li>
+ *   <li><b>which street cells are bridges</b> (PORT #6) — this is the only moment the mod can both
+ *       see a whole street cell and ask the generator how deep the ground under it is, which is
+ *       exactly what "does this road cross water" needs.</li>
  * </ul>
  * Each piece then carries its share of those decisions in its NBT and needs no cross-chunk lookup.
  */
@@ -52,6 +57,13 @@ public class LostCityStructure extends Structure {
 
 	/** Corners of a cell, used to find the terrain low point of the city. */
 	private static final int[][] CELL_CORNERS = {{0, 0}, {15, 0}, {0, 15}, {15, 15}};
+
+	/**
+	 * How far the ground under a street cell may fall below the road surface before the cell becomes
+	 * a bridge. Kept just under {@code Streets.MAX_EMBANKMENT} (8), so the two rules cannot disagree:
+	 * anything the paving would have refused to carry is bridged instead of abandoned.
+	 */
+	private static final int BRIDGE_DROP = 6;
 
 	private final LostCityConfig config;
 
@@ -82,40 +94,94 @@ public class LostCityStructure extends Structure {
 		}
 
 		BlockPos centre = new BlockPos(origin.getMiddleBlockX(), groundY, origin.getMiddleBlockZ());
-		String style = resolveStyle(context, centre);
+		Holder<Biome> biome = biomeAt(context, centre);
+		String style = resolveStyle(biome);
+		StyleSelector.Climate climate = StyleSelector.climateFor(biome);
 
-		return Optional.of(new Structure.GenerationStub(centre, builder -> addPieces(builder, plan, groundY, style)));
+		return Optional.of(new Structure.GenerationStub(centre,
+				builder -> addPieces(builder, context, plan, groundY, style, climate)));
 	}
 
-	private void addPieces(StructurePiecesBuilder builder, CityLayout.Plan plan, int groundY, String style) {
+	private void addPieces(StructurePiecesBuilder builder, Structure.GenerationContext context,
+	                       CityLayout.Plan plan, int groundY, String style, StyleSelector.Climate climate) {
+		LostCityConfig.StreetSettings streets = this.config.streets();
 		for (CityLayout.Cell cell : plan.cells()) {
 			switch (cell.role()) {
 				case BUILDING -> builder.addPiece(new BuildingPiece(
 						cell.chunkX(), cell.chunkZ(), groundY,
 						this.config.buildingName(cell.buildingIndex()), style,
-						cell.floors(), cell.quarterTurns(), this.config.foundation()));
-				case STREET -> builder.addPiece(new StreetPiece(
+						cell.floors(), cell.quarterTurns(), this.config.foundation(),
+						this.config.cellars(), this.config.damageChance(), cell.kind(), climate));
+				// A landmark quadrant is an ordinary building with a name from the 2x2 table, no
+				// rotation (the quadrants have to keep their shared edges) and the same storey count
+				// as its three siblings — all of which the layout already fixed.
+				case MULTI_BUILDING -> builder.addPiece(new BuildingPiece(
 						cell.chunkX(), cell.chunkZ(), groundY,
-						this.config.streetBlock(), this.config.streetWidth(), cell.neighbourMask()));
+						this.config.multiBuildingName(cell.buildingIndex(), cell.variant()), style,
+						cell.floors(), 0, this.config.foundation(),
+						this.config.cellars(), this.config.damageChance(), cell.kind(), climate));
+				case PARK -> builder.addPiece(new ParkPiece(
+						cell.chunkX(), cell.chunkZ(), groundY,
+						this.config.parkName(cell.variant()), style, climate));
+				case STREET -> {
+					if (needsBridge(context, cell, groundY) && !streets.bridges().isEmpty()) {
+						int pick = (int) Math.floorMod(
+								CityLayout.hash(context.seed(), cell.chunkX(), cell.chunkZ(), 0x5E),
+								streets.bridges().size());
+						builder.addPiece(new BridgePiece(cell.chunkX(), cell.chunkZ(), groundY,
+								this.config.bridgeName(pick), style,
+								BridgePiece.turnsForMask(cell.neighbourMask()), climate));
+					} else {
+						builder.addPiece(new StreetPiece(
+								cell.chunkX(), cell.chunkZ(), groundY,
+								streets.block(), streets.width(), cell.neighbourMask(), style,
+								streets.tiles(), streets.lampSpacing(), streets.potholeChance(), climate));
+					}
+				}
 			}
 		}
 	}
 
 	/**
+	 * Whether this street cell has to be bridged rather than paved.
+	 *
+	 * <p>True when the ground under the cell falls more than {@link #BRIDGE_DROP} blocks below the
+	 * road surface anywhere across it — which covers both cases the port cared about: a river or lake
+	 * (the sampled floor is well under the surface) and a ravine or cliff edge (same, without the
+	 * water). Sampling uses the same {@code getFirstOccupiedHeight} call as the city's ground level,
+	 * so the two decisions are made on identical numbers.
+	 */
+	private static boolean needsBridge(Structure.GenerationContext context, CityLayout.Cell cell, int groundY) {
+		ChunkGenerator generator = context.chunkGenerator();
+		int x0 = cell.chunkX() << 4;
+		int z0 = cell.chunkZ() << 4;
+		for (int[] corner : CELL_CORNERS) {
+			int height = generator.getFirstOccupiedHeight(x0 + corner[0], z0 + corner[1],
+					Heightmap.Types.OCEAN_FLOOR_WG, context.heightAccessor(), context.randomState());
+			if (groundY - 1 - height > BRIDGE_DROP) {
+				return true;
+			}
+		}
+		return false;
+	}
+
+	/**
 	 * One ground level for the whole city: the lowest terrain height across the corners of every
-	 * building cell, snapped down to a multiple of the storey height.
+	 * built-on cell, snapped down to a multiple of the storey height.
 	 *
 	 * <p>Taking the minimum means the city is cut into a slope rather than left standing on stilts
 	 * over it — the same rule the group placement used, now applied over a whole city instead of a
 	 * five-cell star. The samples come from {@link ChunkGenerator#getFirstOccupiedHeight}, which
 	 * evaluates the terrain noise directly, so no chunk has to exist and the answer is identical no
-	 * matter which chunk triggered the start.
+	 * matter which chunk triggered the start. Street cells are excluded on purpose: a street that
+	 * happens to cross a river would otherwise drag the whole city down to the river bed, and a
+	 * street over water is a bridge anyway.
 	 */
 	private static int groundLevel(Structure.GenerationContext context, CityLayout.Plan plan) {
 		ChunkGenerator generator = context.chunkGenerator();
 		int lowest = Integer.MAX_VALUE;
 		for (CityLayout.Cell cell : plan.cells()) {
-			if (cell.role() != CityLayout.Role.BUILDING) {
+			if (cell.role() == CityLayout.Role.STREET) {
 				continue;
 			}
 			int x0 = cell.chunkX() << 4;
@@ -137,15 +203,23 @@ public class LostCityStructure extends Structure {
 	 *
 	 * <p>Sampled from the biome <em>source</em> rather than from the level: at start-assembly time
 	 * there is no world to read, and sampling once at the centre is also what keeps every building
-	 * of a city in one palette. The biome→style table itself is untouched
-	 * ({@link StyleSelector#styleFor}) — that file stays the single point of entry for styling.
+	 * of a city in one palette. The biome→style table itself lives in
+	 * {@link StyleSelector#styleFor} — that file stays the single point of entry for styling.
 	 */
-	private static String resolveStyle(Structure.GenerationContext context, BlockPos centre) {
-		Holder<Biome> biome = context.chunkGenerator().getBiomeSource().getNoiseBiome(
-				QuartPos.fromBlock(centre.getX()), QuartPos.fromBlock(centre.getY()), QuartPos.fromBlock(centre.getZ()),
-				context.randomState().sampler());
+	private static String resolveStyle(Holder<Biome> biome) {
 		String style = StyleSelector.styleFor(biome);
 		return style == null ? StyleSelector.DEFAULT_STYLE : style;
+	}
+
+	/**
+	 * The biome at the city's centre, read from the biome <em>source</em> rather than from the level:
+	 * at start-assembly time there is no world to read, and one sample at the centre is also what
+	 * keeps a whole city in one palette instead of half of it in sandstone.
+	 */
+	private static Holder<Biome> biomeAt(Structure.GenerationContext context, BlockPos centre) {
+		return context.chunkGenerator().getBiomeSource().getNoiseBiome(
+				QuartPos.fromBlock(centre.getX()), QuartPos.fromBlock(centre.getY()), QuartPos.fromBlock(centre.getZ()),
+				context.randomState().sampler());
 	}
 
 	@Override

@@ -15,9 +15,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * Guards the city grid — the class that replaced {@code CellLattice}.
  *
  * <p>The invariants the old lattice test checked (a chunk cell is never claimed twice, the result is
- * deterministic) still have to hold, and two more come with the grid: no two buildings share a chunk
- * edge, and a city is never empty. Pure arithmetic — no Minecraft classes are touched, so this runs
- * in a plain JVM.
+ * deterministic) still have to hold, and the grid adds its own: no two buildings share a chunk edge,
+ * a city is never empty, and — new in wave 2 — the street cells form one orthogonally connected
+ * lattice, which is the whole reason the {@code street_*} tiles can be picked from a neighbour mask.
+ * Pure arithmetic: no Minecraft classes are touched, so this runs in a plain JVM.
  */
 class CityLayoutTest {
 
@@ -25,6 +26,11 @@ class CityLayoutTest {
 
 	private static CityLayout.Settings settings() {
 		return new CityLayout.Settings(5, 0.85D, 2, 6, 8, 16);
+	}
+
+	/** Full grid, no parks, no downtown — the shape tests want a deterministic skeleton. */
+	private static CityLayout.Settings full(int size) {
+		return new CityLayout.Settings(size, 1.0D, 2, 6, 8, 16);
 	}
 
 	private static long key(int x, int z) {
@@ -68,6 +74,71 @@ class CityLayoutTest {
 	}
 
 	/**
+	 * The wave-2 fix: every street cell can be walked to from every other one without leaving the
+	 * road. Wave 1's checkerboard failed this — its street cells only met at their corners, which its
+	 * own status file recorded as "diagonally connected, not orthogonally".
+	 */
+	@Test
+	void streetCellsFormOneConnectedLattice() {
+		for (int size : new int[]{5, 7, 9}) {
+			List<CityLayout.Cell> streets = CityLayout.plan(SEED, 0, 0, full(size)).cellsOf(CityLayout.Role.STREET);
+			Set<Long> remaining = new HashSet<>();
+			for (CityLayout.Cell cell : streets) {
+				remaining.add(key(cell.chunkX(), cell.chunkZ()));
+			}
+			assertFalse(remaining.isEmpty(), "size " + size + " produced no streets at all");
+
+			// Flood fill from the first street cell; anything left over is an unreachable island.
+			CityLayout.Cell start = streets.getFirst();
+			java.util.ArrayDeque<long[]> queue = new java.util.ArrayDeque<>();
+			queue.add(new long[]{start.chunkX(), start.chunkZ()});
+			remaining.remove(key(start.chunkX(), start.chunkZ()));
+			while (!queue.isEmpty()) {
+				long[] at = queue.poll();
+				int x = (int) at[0];
+				int z = (int) at[1];
+				for (int[] step : new int[][]{{1, 0}, {-1, 0}, {0, 1}, {0, -1}}) {
+					long next = key(x + step[0], z + step[1]);
+					if (remaining.remove(next)) {
+						queue.add(new long[]{x + step[0], z + step[1]});
+					}
+				}
+			}
+			assertTrue(remaining.isEmpty(), "size " + size + " left " + remaining.size() + " unreachable street cells");
+		}
+	}
+
+	/** A street's mask counts roads, not houses — otherwise every tile would be a crossroads. */
+	@Test
+	void streetMasksCountOnlyOtherStreets() {
+		CityLayout.Plan plan = CityLayout.plan(SEED, 0, 0, full(5));
+
+		// (1, 0) is one cell east of the centre building: a north-south carriageway.
+		CityLayout.Cell straight = find(plan.cells(), 1, 0);
+		assertEquals(CityLayout.Role.STREET, straight.role());
+		assertEquals(CityLayout.NORTH | CityLayout.SOUTH, straight.neighbourMask(),
+				"a carriageway between two lots continues only along its own axis");
+
+		// (1, 1) is diagonally off the centre: the crossroads where the two carriageways meet.
+		CityLayout.Cell crossing = find(plan.cells(), 1, 1);
+		assertEquals(CityLayout.Role.STREET, crossing.role());
+		assertEquals(CityLayout.ALL_SIDES, crossing.neighbourMask(), "the junction reaches all four ways");
+	}
+
+	/** A building's mask still counts everything around it — it describes its lot, not a road. */
+	@Test
+	void buildingMasksCountEveryNeighbour() {
+		CityLayout.Plan plan = CityLayout.plan(SEED, 0, 0, full(5));
+		CityLayout.Cell corner = find(plan.cells(), -2, -2);
+		assertEquals(CityLayout.Role.BUILDING, corner.role());
+		assertEquals(CityLayout.EAST | CityLayout.SOUTH, corner.neighbourMask(),
+				"the north-west corner only has neighbours inside the city");
+
+		CityLayout.Cell centre = find(plan.cells(), 0, 0);
+		assertEquals(CityLayout.ALL_SIDES, centre.neighbourMask(), "the centre lot is surrounded by street");
+	}
+
+	/**
 	 * No empty firings. The old lattice built nothing at all in about a third of its attempts; the
 	 * centre cell here is unconditional, so every city has at least one house even at density 0.
 	 */
@@ -84,13 +155,25 @@ class CityLayoutTest {
 		}
 	}
 
-	/** Density 1 fills every building cell of the checkerboard: 13 of a 5x5, plus 12 streets. */
+	/**
+	 * A lot sits on every cell whose offset from the centre is even on both axes, so an
+	 * {@code n}-cell city has {@code ((n + 1) / 2)^2} lots and the rest is road.
+	 */
 	@Test
-	void fullDensityFillsTheCheckerboard() {
-		CityLayout.Plan plan = CityLayout.plan(SEED, 0, 0, new CityLayout.Settings(5, 1.0D, 2, 6, 8, 16));
-		assertEquals(13, plan.cellsOf(CityLayout.Role.BUILDING).size());
-		assertEquals(12, plan.cellsOf(CityLayout.Role.STREET).size());
-		assertEquals(25, plan.cells().size());
+	void fullDensityFillsEveryOtherCell() {
+		for (int size : new int[]{5, 7, 9}) {
+			CityLayout.Plan plan = CityLayout.plan(SEED, 0, 0, full(size));
+			int lots = 0;
+			for (int di = -(size - 1) / 2; di <= (size - 1) / 2; di++) {
+				if ((di & 1) == 0) {
+					lots++;
+				}
+			}
+			assertEquals(lots * lots, plan.cellsOf(CityLayout.Role.BUILDING).size(), "lots at size " + size);
+			assertEquals(size * size, plan.cells().size(), "total cells at size " + size);
+			assertEquals(size * size - lots * lots, plan.cellsOf(CityLayout.Role.STREET).size(),
+					"street cells at size " + size);
+		}
 	}
 
 	/** The city is centred on the chunk it was rolled for, and that centre is a building. */
@@ -105,10 +188,10 @@ class CityLayoutTest {
 	/** Worldgen has to be stable: two runs on one seed must produce an identical city. */
 	@Test
 	void layoutIsDeterministic() {
+		CityLayout.Settings s = new CityLayout.Settings(9, 0.85D, 2, 6, 8, 16, 0.25D, 6, 0.3D, 5);
 		for (int i = -5; i <= 5; i++) {
-			CityLayout.Plan first = CityLayout.plan(SEED, i, -i, settings());
-			CityLayout.Plan second = CityLayout.plan(SEED, i, -i, settings());
-			assertEquals(first, second, "the same seed and city must give the same plan");
+			assertEquals(CityLayout.plan(SEED, i, -i, s), CityLayout.plan(SEED, i, -i, s),
+					"the same seed and city must give the same plan");
 		}
 	}
 
@@ -158,24 +241,130 @@ class CityLayoutTest {
 		}
 	}
 
+	// --- wave 2: parks, downtown and the skyline ------------------------------------------------
+
+	/** Parks take roughly the configured share of the lots, and only ever replace a lot. */
+	@Test
+	void parkShareIsRoughlyTheConfiguredOne() {
+		CityLayout.Settings s = new CityLayout.Settings(9, 1.0D, 2, 6, 8, 16, 0.25D, 6, 0.0D, 5);
+		int lots = 0;
+		int parks = 0;
+		for (int cx = -30; cx <= 30; cx += 3) {
+			for (int cz = -30; cz <= 30; cz += 3) {
+				CityLayout.Plan plan = CityLayout.plan(SEED, cx, cz, s);
+				lots += plan.cellsOf(CityLayout.Role.BUILDING).size() + plan.cellsOf(CityLayout.Role.PARK).size();
+				parks += plan.cellsOf(CityLayout.Role.PARK).size();
+				assertEquals(9 * 9, plan.cells().size(), "parks must replace lots, not remove cells");
+			}
+		}
+		double share = (double) parks / lots;
+		assertTrue(share > 0.20D && share < 0.30D, "park share drifted to " + share);
+	}
+
+	/** A park picks a part index inside the configured list, and never claims to have floors. */
+	@Test
+	void parkCellsAreWellFormed() {
+		CityLayout.Settings s = new CityLayout.Settings(9, 1.0D, 2, 6, 8, 16, 0.5D, 4, 0.0D, 5);
+		for (int cx = -10; cx <= 10; cx++) {
+			for (CityLayout.Cell cell : CityLayout.plan(SEED, cx, 0, s).cellsOf(CityLayout.Role.PARK)) {
+				assertTrue(cell.variant() >= 0 && cell.variant() < 4, "park part index out of range");
+				assertEquals(0, cell.floors());
+				assertEquals(0, cell.quarterTurns());
+			}
+		}
+	}
+
+	/** Zero park chance means no parks at all — the knob really does turn it off. */
+	@Test
+	void zeroParkChanceMeansNoParks() {
+		CityLayout.Settings s = new CityLayout.Settings(9, 1.0D, 2, 6, 8, 16, 0.0D, 6, 0.0D, 5);
+		for (int cx = -20; cx <= 20; cx++) {
+			assertTrue(CityLayout.plan(SEED, cx, 7, s).cellsOf(CityLayout.Role.PARK).isEmpty());
+		}
+	}
+
 	/**
-	 * Neighbour masks describe the grid honestly: a street cell in the middle of a full-density city
-	 * sees buildings on all four sides, a corner building sees only the two streets inside the city.
+	 * A downtown city gets exactly four landmark quadrants, they are a 2×2 block rooted at the city
+	 * centre, they carry the four distinct quadrant indices, and they agree on storeys and rotation —
+	 * which is the entire correctness condition for a multi-chunk building.
 	 */
 	@Test
-	void neighbourMasksMatchTheGrid() {
-		CityLayout.Plan plan = CityLayout.plan(SEED, 0, 0, new CityLayout.Settings(5, 1.0D, 2, 6, 8, 16));
-		int all = CityLayout.NORTH | CityLayout.EAST | CityLayout.SOUTH | CityLayout.WEST;
+	void downtownPlacesOneWellFormedQuad() {
+		CityLayout.Settings always = new CityLayout.Settings(9, 1.0D, 2, 6, 8, 16, 0.0D, 6, 1.0D, 5);
+		int found = 0;
+		for (int cx = -6; cx <= 6; cx++) {
+			for (int cz = -6; cz <= 6; cz++) {
+				CityLayout.Plan plan = CityLayout.plan(SEED, cx, cz, always);
+				assertTrue(plan.downtown(), "downtown chance 1 must always produce a downtown");
+				List<CityLayout.Cell> quad = plan.cellsOf(CityLayout.Role.MULTI_BUILDING);
+				assertEquals(4, quad.size(), "a landmark is exactly four quadrants");
 
-		CityLayout.Cell innerStreet = find(plan.cells(), 1, 0);
-		assertEquals(CityLayout.Role.STREET, innerStreet.role());
-		assertEquals(all, innerStreet.neighbourMask(), "an inner street touches four cells");
-
-		CityLayout.Cell corner = find(plan.cells(), -2, -2);
-		assertEquals(CityLayout.Role.BUILDING, corner.role());
-		assertEquals(CityLayout.EAST | CityLayout.SOUTH, corner.neighbourMask(),
-				"the north-west corner only has neighbours inside the city");
+				Set<Integer> variants = new HashSet<>();
+				for (CityLayout.Cell cell : quad) {
+					variants.add(cell.variant());
+					assertEquals(quad.getFirst().floors(), cell.floors(), "quadrants must share a storey count");
+					assertEquals(quad.getFirst().buildingIndex(), cell.buildingIndex(),
+							"quadrants must come from the same landmark");
+					assertEquals(0, cell.quarterTurns(), "quadrants must not be rotated apart");
+					assertTrue(cell.chunkX() >= cx && cell.chunkX() <= cx + 1, "quadrant outside the quad");
+					assertTrue(cell.chunkZ() >= cz && cell.chunkZ() <= cz + 1, "quadrant outside the quad");
+				}
+				assertEquals(Set.of(0, 1, 2, 3), variants, "the four quadrants must be distinct");
+				found++;
+			}
+		}
+		assertEquals(13 * 13, found);
 	}
+
+	/** No downtown chance, no landmark — and the centre stays an ordinary building. */
+	@Test
+	void withoutDowntownThereIsNoLandmark() {
+		CityLayout.Settings never = new CityLayout.Settings(9, 1.0D, 2, 6, 8, 16, 0.0D, 6, 0.0D, 5);
+		for (int cx = -20; cx <= 20; cx++) {
+			CityLayout.Plan plan = CityLayout.plan(SEED, cx, -3, never);
+			assertFalse(plan.downtown());
+			assertTrue(plan.cellsOf(CityLayout.Role.MULTI_BUILDING).isEmpty());
+		}
+	}
+
+	/**
+	 * The skyline of IMPROVEMENTS #6: the ceiling on storeys falls off towards the city edge, so the
+	 * outermost ring is always the configured minimum and only the middle can reach the maximum.
+	 */
+	@Test
+	void floorsTaperTowardsTheCityEdge() {
+		CityLayout.Settings s = new CityLayout.Settings(9, 1.0D, 2, 6, 8, 16, 0.0D, 6, 0.0D, 5);
+		boolean sawMax = false;
+		for (int cx = -25; cx <= 25; cx++) {
+			for (CityLayout.Cell cell : CityLayout.plan(SEED, cx, 4, s).cellsOf(CityLayout.Role.BUILDING)) {
+				int ring = Math.max(Math.abs(cell.chunkX() - cx), Math.abs(cell.chunkZ() - 4));
+				if (ring == 4) {
+					assertEquals(s.minFloors(), cell.floors(), "the outer ring must be the minimum height");
+				}
+				sawMax |= cell.floors() == s.maxFloors();
+				assertTrue(cell.floors() >= s.minFloors() && cell.floors() <= s.maxFloors());
+			}
+		}
+		assertTrue(sawMax, "nothing ever reached the configured maximum height");
+	}
+
+	/** A building's kind is stable, in range, and the tall ones really are towers. */
+	@Test
+	void buildingKindsAreWellFormed() {
+		CityLayout.Settings s = new CityLayout.Settings(9, 1.0D, 2, 6, 8, 16, 0.0D, 6, 0.0D, 5);
+		Set<CityLayout.BuildingKind> seen = new HashSet<>();
+		for (int cx = -25; cx <= 25; cx++) {
+			for (CityLayout.Cell cell : CityLayout.plan(SEED, cx, 11, s).cellsOf(CityLayout.Role.BUILDING)) {
+				seen.add(cell.kind());
+				if (cell.floors() == s.maxFloors()) {
+					assertEquals(CityLayout.BuildingKind.TOWER, cell.kind());
+				}
+			}
+		}
+		assertEquals(4, seen.size(), "every building kind should occur somewhere: " + seen);
+	}
+
+	// --- pure helpers ---------------------------------------------------------------------------
 
 	private static CityLayout.Cell find(List<CityLayout.Cell> cells, int chunkX, int chunkZ) {
 		return cells.stream()
@@ -214,13 +403,17 @@ class CityLayoutTest {
 	/** Settings normalise nonsense from a datapack instead of propagating it into worldgen. */
 	@Test
 	void settingsAreNormalised() {
-		CityLayout.Settings s = new CityLayout.Settings(0, 5.0D, -3, -9, 0, 99);
+		CityLayout.Settings s = new CityLayout.Settings(0, 5.0D, -3, -9, 0, 99, -1.0D, 0, 7.0D, 0);
 		assertEquals(1, s.citySize());
 		assertEquals(1.0D, s.density());
 		assertEquals(0, s.minFloors());
 		assertEquals(0, s.maxFloors());
 		assertEquals(1, s.buildingCount());
 		assertEquals(16, s.streetWidth());
+		assertEquals(0.0D, s.parkChance());
+		assertEquals(1, s.parkKindCount());
+		assertEquals(1.0D, s.downtownChance());
+		assertEquals(1, s.multiBuildingCount());
 	}
 
 	/** The hash is stable and salts really do separate the rolls. */

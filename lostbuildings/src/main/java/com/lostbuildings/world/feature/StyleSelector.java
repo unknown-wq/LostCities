@@ -11,33 +11,37 @@ import net.minecraft.world.level.biome.Biome;
 import net.minecraft.world.level.biome.Biomes;
 
 /**
- * Picks the Lost Cities <em>style</em> (the set of palettes a building is built from) from the
- * surroundings, instead of always using the grey-brick {@code standard} style.
+ * Picks the Lost Cities <em>style</em> (the set of palettes a building is built from) and the
+ * <em>climate</em> (what weathering the finished building gets) from the surroundings, instead of
+ * always using the grey-brick {@code standard} style.
+ *
+ * <p><b>Wave 2 (IMPROVEMENTS #9, second half of PORT #9).</b> The table below is the port of what the
+ * original expressed as {@code worldstyles/standard.json}'s {@code citystyles} list: a set of
+ * biome predicates, each naming the city style to build with. The original's indirection — a
+ * {@code citystyle} that names a {@code style} plus street/park block choices — is deliberately
+ * collapsed into "biome → style name" here, because in this port the street and park blocks already
+ * come from the structure's own datapack config rather than from the city style. The shipped
+ * {@code citystyles/} files are in the resources for the codecs that read them; what actually
+ * decides a city's look is this table plus {@code data/lostbuildings/lostcities/styles/}.
  *
  * <p>Style names must exist under {@code data/lostbuildings/lostcities/styles/}; the shipped set is
- * {@code standard}, {@code standard_border}, {@code desert}, {@code outside}.
+ * {@code standard}, {@code standard_border}, {@code desert}, {@code outside}, and the two wave-2
+ * additions {@code snowy} and {@code swamp} (both built from palettes that were already there — no
+ * new blocks, just a different draw from the same bag).
  *
- * <p><b>Sampling window.</b> During the FEATURES step a feature may only touch the origin chunk
- * ±1 chunk; reading a biome further out hits a chunk whose biomes have not been generated yet and
- * throws {@code IllegalStateException: Requested chunk unavailable during world generation}.
+ * <p><b>Climate is separate from style</b> on purpose. A style changes what a building is made of,
+ * which has to be decided once for the whole city or it comes out patchwork. Climate changes what
+ * has grown on it since, which is a per-piece surface pass: snow settles on the roofs in the north,
+ * moss creeps over them in a swamp. Both are sampled at structure-assembly time from the biome
+ * source, so no piece ever reads a biome during generation — see {@link WorldGenBounds} for why that
+ * matters.
  *
- * <p>Probes used to be expressed as ±16 <em>block</em> offsets from the raw feature origin, on the
- * theory that ±16 blocks can never cross more than one chunk border. As block arithmetic that is
- * true — but {@code BiomeManager.getBiome} does not read the position it is handed. It subtracts 2
- * from each axis and then lets a seed-derived fuzz pick the next quart cell up, so the chunk it
- * actually loads lies in {@code [(x - 2) >> 4, (x + 5) >> 4]}. A probe landing on a chunk's minimum
- * block edge resolved into the <em>previous</em> chunk and one on the maximum edge into the next —
- * two chunks out from the origin, and a crash. See {@link WorldGenBounds} for the full derivation.
- *
- * <p>Probes are therefore anchored on chunk <em>centres</em>: eight blocks of slack on every side,
- * far more than the fuzz can consume, so every probe is safe by construction. Each one is still run
- * past {@link WorldGenBounds#canSampleBiome} and skipped rather than trusted, because a probe that
- * cannot be answered must not take chunk generation down with it.
- *
- * <p><b>Caveat.</b> The biome at the origin is normally {@code lostbuildings:lost_city} itself
- * (Biolith replaces a slice of the host biome, and the feature only runs inside the replacement),
- * so the useful signal comes from the probes that land just outside the patch. Deep inside a large
- * patch every probe still returns {@code lost_city} and the default style is used.
+ * <p><b>Sampling window.</b> {@link #select} is the feature-era entry point and still probes the
+ * world directly; during the FEATURES step a feature may only touch the origin chunk ±1 chunk, and
+ * reading a biome further out throws {@code IllegalStateException: Requested chunk unavailable
+ * during world generation}. Probes are therefore anchored on chunk <em>centres</em>: eight blocks of
+ * slack on every side, far more than {@code BiomeManager}'s seed fuzz can consume, and each one is
+ * still run past {@link WorldGenBounds#canSampleBiome} and skipped rather than trusted.
  */
 public final class StyleSelector {
 
@@ -45,13 +49,33 @@ public final class StyleSelector {
 	public static final String DEFAULT_STYLE = "standard";
 	/** Sand / sandstone style — {@code styles/desert.json}. */
 	public static final String DESERT_STYLE = "desert";
+	/** Pale quartz-and-silver style for the cold biomes — {@code styles/snowy.json}. */
+	public static final String SNOWY_STYLE = "snowy";
+	/** Grey, gloomy style for wetlands — {@code styles/swamp.json}. */
+	public static final String SWAMP_STYLE = "swamp";
+
+	/** What has happened to a building since the city was abandoned. */
+	public enum Climate {
+		/** Nothing in particular. */
+		TEMPERATE,
+		/** Snow settles on every flat surface. */
+		SNOWY,
+		/** Moss creeps over the roofs. */
+		SWAMPY
+	}
 
 	/**
-	 * Vanilla has no {@code #minecraft:is_desert}; {@code #c:is_desert} is the conventional
-	 * cross-mod tag, and {@code minecraft:desert} is matched explicitly for the vanilla case.
+	 * Vanilla has no {@code #minecraft:is_desert} / {@code is_swamp} / {@code is_snowy};
+	 * {@code #c:*} is the conventional cross-mod family, and the vanilla cases are matched
+	 * explicitly alongside them.
 	 */
-	private static final TagKey<Biome> CONVENTIONAL_IS_DESERT =
-			TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath("c", "is_desert"));
+	private static final TagKey<Biome> CONVENTIONAL_IS_DESERT = conventional("is_desert");
+	private static final TagKey<Biome> CONVENTIONAL_IS_SWAMP = conventional("is_swamp");
+	private static final TagKey<Biome> CONVENTIONAL_IS_SNOWY = conventional("is_snowy");
+
+	private static TagKey<Biome> conventional(String name) {
+		return TagKey.create(Registries.BIOME, Identifier.fromNamespaceAndPath("c", name));
+	}
 
 	/**
 	 * Origin chunk plus the 8 neighbours one chunk out, as <em>chunk</em> offsets. The order is
@@ -99,14 +123,54 @@ public final class StyleSelector {
 		return columns;
 	}
 
-	/** Style for one biome, or null when the biome carries no opinion. */
+	/**
+	 * Style for one biome, or null when the biome carries no opinion.
+	 *
+	 * <p>Order matters: deserts and badlands win over everything (they are the most visually
+	 * distinctive), then wetlands, then the cold biomes — a snowy taiga next to a swamp reads as
+	 * swamp only if it is genuinely wet.
+	 */
 	public static String styleFor(Holder<Biome> biome) {
-		if (biome.is(BiomeTags.IS_BADLANDS)
-				|| biome.is(Biomes.DESERT)
-				|| biome.is(BiomeTags.HAS_VILLAGE_DESERT)
-				|| biome.is(CONVENTIONAL_IS_DESERT)) {
+		if (isDesert(biome)) {
 			return DESERT_STYLE;
 		}
+		if (isSwamp(biome)) {
+			return SWAMP_STYLE;
+		}
+		if (isSnowy(biome)) {
+			return SNOWY_STYLE;
+		}
 		return null;
+	}
+
+	/** What weathering a building in this biome gets. Never null. */
+	public static Climate climateFor(Holder<Biome> biome) {
+		if (isSnowy(biome)) {
+			return Climate.SNOWY;
+		}
+		if (isSwamp(biome)) {
+			return Climate.SWAMPY;
+		}
+		return Climate.TEMPERATE;
+	}
+
+	private static boolean isDesert(Holder<Biome> biome) {
+		return biome.is(BiomeTags.IS_BADLANDS)
+				|| biome.is(Biomes.DESERT)
+				|| biome.is(BiomeTags.HAS_VILLAGE_DESERT)
+				|| biome.is(CONVENTIONAL_IS_DESERT);
+	}
+
+	private static boolean isSwamp(Holder<Biome> biome) {
+		return biome.is(Biomes.SWAMP)
+				|| biome.is(Biomes.MANGROVE_SWAMP)
+				|| biome.is(CONVENTIONAL_IS_SWAMP);
+	}
+
+	private static boolean isSnowy(Holder<Biome> biome) {
+		return biome.is(BiomeTags.HAS_VILLAGE_SNOWY)
+				|| biome.is(BiomeTags.HAS_IGLOO)
+				|| biome.is(BiomeTags.SPAWNS_SNOW_FOXES)
+				|| biome.is(CONVENTIONAL_IS_SNOWY);
 	}
 }
