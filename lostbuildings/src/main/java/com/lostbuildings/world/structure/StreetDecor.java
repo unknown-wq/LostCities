@@ -13,6 +13,12 @@ package com.lostbuildings.world.structure;
  * everything else is pavement. A kerb column is therefore a pavement column that touches the
  * roadway, which is a single ring one block wide — precisely where a kerbstone and a lamp post
  * belong.
+ *
+ * <p>The tiles raise the pavement one block above the carriageway and sink a gutter channel into the
+ * road columns that touch it, so the kerb ring is the step between the two: the half slab
+ * {@code StreetPiece} drops here is the middle of a road → kerb → pavement climb rather than a lip on
+ * a flat surface. Everything the tiles put on the pavement is deliberately kept <em>off</em> this
+ * ring, because {@code StreetPiece.decorate} overwrites it after the tile is stamped.
  */
 public final class StreetDecor {
 
@@ -69,6 +75,14 @@ public final class StreetDecor {
 	 * carriageway on world Z. Kerbs at the corners of a junction touch both and take the X rule, so
 	 * a junction never grows two lamps in the same square.
 	 *
+	 * <p><b>The two kerbs of one street are staggered.</b> Spacing alone put a lamp on the near kerb
+	 * and another directly opposite it on the far one, which reads as a gate every {@code spacing}
+	 * blocks rather than as a lit street. The far kerb — the one with the roadway to its north (for an
+	 * X-spaced kerb) or to its west (for a Z-spaced one) — is offset by half a span, so the lamps
+	 * alternate down the street and light it twice as evenly for the same number of posts. Which kerb
+	 * counts as "far" is decided from the roadway alone, so it is the same answer on both sides of a
+	 * cell boundary and the alternation carries across cells exactly as the spacing does.
+	 *
 	 * @param worldX  absolute block X of the column
 	 * @param worldZ  absolute block Z of the column
 	 * @param dx      column X inside the cell, {@code 0..15}
@@ -81,9 +95,14 @@ public final class StreetDecor {
 			return false;
 		}
 		if (isRoad(dx, dz - 1, mask) || isRoad(dx, dz + 1, mask)) {
-			return Math.floorMod(worldX, spacing) == 0;
+			return Math.floorMod(worldX - stagger(isRoad(dx, dz - 1, mask), spacing), spacing) == 0;
 		}
-		return Math.floorMod(worldZ, spacing) == 0;
+		return Math.floorMod(worldZ - stagger(isRoad(dx - 1, dz, mask), spacing), spacing) == 0;
+	}
+
+	/** Half a span of offset for the far kerb of a street, and none for the near one. */
+	private static int stagger(boolean farKerb, int spacing) {
+		return farKerb ? spacing / 2 : 0;
 	}
 
 	/**

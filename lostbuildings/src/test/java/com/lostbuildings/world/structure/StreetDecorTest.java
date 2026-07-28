@@ -139,6 +139,40 @@ class StreetDecorTest {
 		assertFalse(StreetDecor.isLamp(40, 7, 3, 8, N | S, spacing), "X being aligned must not matter here");
 	}
 
+	/**
+	 * The two kerbs of one street alternate rather than facing each other off.
+	 *
+	 * <p>A lamp opposite a lamp lights the street in bands with dark gaps between them; offsetting the
+	 * far kerb by half a span halves the gap for the same number of posts. The offset has to be a
+	 * property of the roadway, not of the cell, or it would flip at chunk seams — so this walks four
+	 * cells of road and checks the far kerb keeps its half-span offset the whole way.
+	 */
+	@Test
+	void theTwoKerbsOfAStreetAreStaggered() {
+		int spacing = 8;
+		int nearKerb = 3;       // north of a west-east carriageway
+		int farKerb = 12;       // south of it
+		for (int cell = -2; cell < 2; cell++) {
+			int cellMinX = cell * 16;
+			for (int dx = 0; dx < 16; dx++) {
+				int worldX = cellMinX + dx;
+				assertEquals(Math.floorMod(worldX, spacing) == 0,
+						StreetDecor.isLamp(worldX, 0, dx, nearKerb, W | E, spacing),
+						"the near kerb is unshifted at x=" + worldX);
+				assertEquals(Math.floorMod(worldX - spacing / 2, spacing) == 0,
+						StreetDecor.isLamp(worldX, 0, dx, farKerb, W | E, spacing),
+						"the far kerb is offset half a span at x=" + worldX);
+			}
+		}
+		// Same rule on the other axis: the kerb east of a north-south carriageway is the far one.
+		for (int dz = 0; dz < 16; dz++) {
+			assertEquals(Math.floorMod(dz, spacing) == 0,
+					StreetDecor.isLamp(0, dz, 3, dz, N | S, spacing));
+			assertEquals(Math.floorMod(dz - spacing / 2, spacing) == 0,
+					StreetDecor.isLamp(0, dz, 12, dz, N | S, spacing));
+		}
+	}
+
 	/** A junction never grows two lamps in the same square: corner kerbs take one rule, not both. */
 	@Test
 	void lampChoiceIsSingleValued() {
