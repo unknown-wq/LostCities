@@ -419,6 +419,9 @@ public class BuildingEngine {
                         }
                     }
 
+                    // Built here (so every random draw keeps its place in the stream) but applied
+                    // only after setBlock — see attachBlockEntity for why the order matters.
+                    CompoundTag pendingBlockEntity = null;
                     if (inf != null) {
                         if (inf.isTorch()) {
                             if (!s.lighting()) {
@@ -428,11 +431,11 @@ public class BuildingEngine {
                             if (!s.spawners()) {
                                 continue;   // no spawners -> leave empty
                             }
-                            handleSpawner(level, pos, inf.mobId(), rand, ctx);
+                            pendingBlockEntity = spawnerTag(level, pos, inf.mobId(), rand, ctx);
                         } else {
                             String loot = (s.loot() && inf.loot() != null && !inf.loot().isEmpty()) ? inf.loot() : null;
                             if (inf.tag() != null || loot != null) {
-                                handleBlockEntity(level, pos, b, inf.tag(), loot, rand, ctx);
+                                pendingBlockEntity = blockEntityTag(level, pos, b, inf.tag(), loot, rand, ctx);
                             }
                         }
                     }
@@ -442,6 +445,7 @@ public class BuildingEngine {
                         continue;   // STRUCTURE_VOID passthrough
                     }
                     level.setBlock(pos, corrected, SET_FLAGS);
+                    attachBlockEntity(level, pos, pendingBlockEntity);
 
                     Block cb = corrected.getBlock();
                     if (cb instanceof CrossCollisionBlock || cb instanceof WallBlock || cb instanceof StairBlock) {
@@ -455,12 +459,31 @@ public class BuildingEngine {
 
     // --- inlined handlers (run synchronously) ---
 
-    private void handleSpawner(WorldGenLevel level, BlockPos pos, String mobCondition, RandomSource rand,
-                               ConditionContext ctx) {
+    /**
+     * Attach a pending block-entity NBT compound to a position that has just been written.
+     *
+     * <p><b>This must run after {@code level.setBlock}, never before.</b> During worldgen the chunk
+     * is a {@code ProtoChunk}, so {@code WorldGenRegion.setBlock} takes the "not a LEVELCHUNK yet"
+     * branch: for any state with a block entity it calls {@code chunk.setBlockEntityNbt} itself with
+     * a placeholder compound whose {@code id} is the literal {@code "DUMMY"}. {@code
+     * ChunkAccess.setBlockEntityNbt} is a plain {@code Map.put} keyed by position, so whichever call
+     * happens last wins. Writing the real tag first therefore threw it away: at promotion time
+     * {@code LevelChunk.promotePendingBlockEntity} saw {@code "DUMMY"} and simply created a blank
+     * block entity from the block — an empty chest, a spawner with no {@code SpawnData}.
+     */
+    private static void attachBlockEntity(WorldGenLevel level, BlockPos pos, @Nullable CompoundTag tag) {
+        if (tag != null) {
+            level.getChunk(pos).setBlockEntityNbt(tag);
+        }
+    }
+
+    @Nullable
+    private CompoundTag spawnerTag(WorldGenLevel level, BlockPos pos, String mobCondition, RandomSource rand,
+                                   ConditionContext ctx) {
         String mobId = resolveCondition(promote(mobCondition, level.getSeed(), pos, ctx), rand, ctx,
                 ConditionResolver.Kind.MOB);
         if (mobId == null) {
-            return;
+            return null;
         }
         CompoundTag tag = new CompoundTag();
         tag.putString("id", "minecraft:mob_spawner");
@@ -472,7 +495,7 @@ public class BuildingEngine {
         CompoundTag spawnData = new CompoundTag();
         spawnData.put("entity", entity);
         tag.put("SpawnData", spawnData);
-        level.getChunk(pos).setBlockEntityNbt(tag);
+        return tag;
     }
 
     /**
@@ -510,26 +533,30 @@ public class BuildingEngine {
     }
 
     /**
-     * Write the pending block-entity NBT for a position. During the FEATURES step the chunk is still
-     * a {@code ProtoChunk} and {@link WorldGenLevel#getBlockEntity} returns {@code null} there, so
-     * the data has to go through {@code ChunkAccess.setBlockEntityNbt} — it is applied when the
-     * chunk is promoted and the real block entity is created.
+     * Build the block-entity NBT for a position, or {@code null} if the block has no block entity.
+     *
+     * <p>During the FEATURES step the chunk is still a {@code ProtoChunk} and
+     * {@link WorldGenLevel#getBlockEntity} returns {@code null} there, so the data has to go through
+     * {@code ChunkAccess.setBlockEntityNbt} — it is applied when the chunk is promoted and the real
+     * block entity is created. The caller does that, <em>after</em> placing the block; see
+     * {@link #attachBlockEntity}.
      *
      * <p>The loot table is stored the way {@code RandomizableContainer.tryLoadLootTable} reads it
      * back in 26.2: {@code "LootTable"} (a plain resource-location string, decoded with
      * {@code LootTable.KEY_CODEC}) and {@code "LootTableSeed"} (a long; 0 means "roll a fresh random
      * seed on first open", so a seed derived from the worldgen random is written for determinism).
      */
-    private void handleBlockEntity(WorldGenLevel level, BlockPos pos, BlockState b,
-                                   @Nullable CompoundTag extra, @Nullable String lootCondition, RandomSource rand,
-                                   ConditionContext ctx) {
+    @Nullable
+    private CompoundTag blockEntityTag(WorldGenLevel level, BlockPos pos, BlockState b,
+                                       @Nullable CompoundTag extra, @Nullable String lootCondition, RandomSource rand,
+                                       ConditionContext ctx) {
         BlockEntityType<?> type = getTypeForBlock(b);
         if (type == null) {
-            return;
+            return null;
         }
         Identifier typeKey = BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(type);
         if (typeKey == null) {
-            return;
+            return null;
         }
         CompoundTag tag = extra == null ? new CompoundTag() : extra.copy();
         if (lootCondition != null) {
@@ -555,7 +582,7 @@ public class BuildingEngine {
         tag.putInt("y", pos.getY());
         tag.putInt("z", pos.getZ());
         tag.putString("id", typeKey.toString());
-        level.getChunk(pos).setBlockEntityNbt(tag);
+        return tag;
     }
 
     /**
