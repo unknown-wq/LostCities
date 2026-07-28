@@ -23,6 +23,32 @@
         }
       ],
       "damaged": "minecraft:iron_bars"
+    },
+    {
+      "char": "}",
+      "blocks": [
+        {
+          "random": 12,
+          "block": "minecraft:red_sandstone_stairs"
+        },
+        {
+          "random": 12,
+          "block": "minecraft:red_sandstone_slab"
+        },
+        {
+          "random": 10,
+          "block": "minecraft:chiseled_red_sandstone"
+        },
+        {
+          "random": 12,
+          "block": "minecraft:cut_red_sandstone"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:red_sandstone"
+        }
+      ],
+      "damaged": "minecraft:iron_bars"
     }
   ]
 }
