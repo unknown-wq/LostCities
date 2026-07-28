@@ -52,10 +52,25 @@ public class StreetPiece extends CityPiece {
 	private static final int BELOW_GROUND = 12;
 	private static final int ABOVE_GROUND = 6;
 
-	/** Height of a lamp post, not counting the light on top. */
-	private static final int LAMP_HEIGHT = 3;
+	/**
+	 * Height of a lamp post, not counting the lantern on top.
+	 *
+	 * <p>Counted from {@code groundY}, which is the <em>top</em> of the pavement course the tiles lay,
+	 * not the surface someone walks on: the bottom post block is flush with the paving and invisible.
+	 * A post of 3 therefore read as two bars and a lantern at head height — a bollard, not a street
+	 * light. Five puts four bars above the pavement with the lantern at {@code groundY + 5}, one block
+	 * under the top of the piece's box ({@code groundY + ABOVE_GROUND}), so it still fits and is still
+	 * written.
+	 *
+	 * <p>Nothing else reaches this high on the kerb: the tiles put their tall decoration
+	 * ({@code w}alls, {@code A}rches, torches) on pavement columns only, deliberately keeping the kerb
+	 * ring clear because {@link #decorate} overwrites it.
+	 */
+	private static final int LAMP_HEIGHT = 5;
 	/** Share of lamp posts that lost their light — a lost city, not a serviced one. */
 	private static final double BROKEN_LAMP_CHANCE = 0.25D;
+	/** Salt for the tile-variant roll, so it is independent of every other per-cell decision. */
+	private static final int VARIANT_SALT = 0x53;
 
 	private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 	private static final BlockState KERB = Blocks.SMOOTH_STONE_SLAB.defaultBlockState()
@@ -129,29 +144,43 @@ public class StreetPiece extends CityPiece {
 		int surfaceY = this.groundY - 1;
 
 		if (this.tiles) {
-			layTile(level, chunkBox, rand);
+			layTile(level, chunkBox, rand, seed);
 		}
 		decorate(level, chunkBox, seed, surfaceY);
 		weather(level, chunkBox, seed);
 	}
 
-	/** Stamp the {@code street_*} part chosen for this cell's connectivity over the base course. */
-	private void layTile(WorldGenLevel level, BoundingBox chunkBox, RandomSource rand) {
+	/**
+	 * Stamp the {@code street_*} part chosen for this cell's connectivity over the base course.
+	 *
+	 * <p>Which of the family's variants is laid comes from the world seed and this cell's coordinate
+	 * and nothing else, exactly like the potholes and the broken lamps: a road that regenerates has to
+	 * come back the same, and two cells of the same shape have to be allowed to differ — otherwise a
+	 * long straight is the same sixteen blocks over and over.
+	 */
+	private void layTile(WorldGenLevel level, BoundingBox chunkBox, RandomSource rand, long seed) {
 		Assets assets = LostBuildings.ASSETS;
 		BuildingEngine engine = LostBuildings.ENGINE;
 		if (assets == null || engine == null) {
 			return;     // assets not loaded yet; the base course alone is a road, just a plain one
 		}
-		StreetTiles.Tile tile = StreetTiles.forMask(this.neighbourMask);
+		StreetTiles.Tile tile = StreetTiles.forMask(this.neighbourMask,
+				CityLayout.hash(seed, cellChunkX(), cellChunkZ(), VARIANT_SALT));
 		BuildingPart part = assets.getPart(tile.part());
+		if (part == null) {
+			// A datapack that removed one variant must not blank the cell: fall back to the family.
+			part = assets.getPart(StreetTiles.forMask(this.neighbourMask).part());
+		}
 		if (part == null) {
 			return;
 		}
 		Style style = assets.getStyle(this.styleName);
 		CompiledPalette palette = engine.buildPalette(assets, rand, style);
 		Transform transform = Transform.values()[Math.floorMod(tile.quarterTurns(), 4)];
-		// The tile is a single slice and its road blocks are full-height, so it replaces the base
-		// course rather than sitting on it: it goes at the surface, not one above.
+		// The tile's slice 0 is the carriageway itself, so it replaces the base course rather than
+		// sitting on it: the part goes at the surface, not one above. Slice 1 is then the raised
+		// pavement course at groundY, and the shipped tiles carry three more decoration slices — the
+		// piece's box has room for eight in all (groundY - 1 .. groundY + ABOVE_GROUND).
 		PartPlacer.place(level, chunkBox, part, cellMinX(), this.groundY - 1, cellMinZ(), transform, palette, rand);
 	}
 
@@ -161,6 +190,11 @@ public class StreetPiece extends CityPiece {
 	 * <p>Kerbs and lamps sit one block above the road surface, on the pavement ring that
 	 * {@link StreetDecor#isKerb} identifies; potholes cut into the surface itself. Whether a lamp is
 	 * still lit comes from the world seed and the lamp's own column, so it survives a reload.
+	 *
+	 * <p>Where a crossing meets the ring the kerb is <em>dropped</em> instead: the column is cleared
+	 * back to the base course, which leaves it flush with the carriageway. The ring used to be written
+	 * unconditionally, so the crossings the junction tiles paint ran straight into a raised kerbstone.
+	 * A lamp post is not planted there either — it would stand in the middle of the crossing.
 	 */
 	private void decorate(WorldGenLevel level, BoundingBox chunkBox, long seed, int surfaceY) {
 		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
@@ -176,6 +210,10 @@ public class StreetPiece extends CityPiece {
 					continue;
 				}
 				if (!StreetDecor.isKerb(dx, dz, this.neighbourMask)) {
+					continue;
+				}
+				if (StreetDecor.isDroppedKerb(dx, dz, this.neighbourMask)) {
+					set(level, chunkBox, cursor.set(wx, surfaceY + 1, wz), AIR);
 					continue;
 				}
 				if (StreetDecor.isLamp(wx, wz, dx, dz, this.neighbourMask, this.lampSpacing)) {

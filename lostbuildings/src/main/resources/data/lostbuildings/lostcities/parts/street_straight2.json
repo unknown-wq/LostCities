@@ -3,45 +3,45 @@
   "zsize": 16,
   "slices": [
     [
-      "bbbb_SSSSSS_bbbb",
-      "bbbb_,Q,Q,Q_bbbb",
-      "bbbb_,S,S,S_bbbb",
-      "bbbb:QQQQQQ_bbbb",
-      "____SSSSSSGS:___",
-      "S,,QSvvv9SSSQ,,S",
-      "SQSQSvvvSSSSQSQS",
-      "S,,QSSSSSSS9Q,,S",
-      "SQSQGSSSSSSSQSQS",
-      "S,,QSSSWSvvSQ,,S",
-      "SQSQvv9WSvvSQSQS",
-      "___:vvSSSvvS____",
-      "bbbb_QQQQQQ:bbbb",
-      "bbbb_,S,S,S_bbbb",
-      "bbbb_,Q,Q,Q_bbbb",
-      "bbbb_SSSSSS_bbbb"
+      "bbbbbbbbbbbbbbbb",
+      "bbbbbbbbbbbbbbbb",
+      "bbbbbbbbbbbbbbbb",
+      "bbbbbbbbbbbbbbbb",
+      "___:____________",
+      "SSSSS9SSvvSSSSSS",
+      "SGSSSSSSvvSSS9SS",
+      "QQSSQQSSQQSSQQSS",
+      "QQSSQQSSQQSSQQSS",
+      "SvvSSSSSWWSSSSSS",
+      "SvvSSS9SSSSSSSGS",
+      "____________:___",
+      "bbbbbbbbbbbbbbbb",
+      "bbbbbbbbbbbbbbbb",
+      "bbbbbbbbbbbbbbbb",
+      "bbbbbbbbbbbbbbbb"
     ],
     [
-      "xxB_        _BGG",
-      "xxB_        _Bxx",
-      "BBB_        _BBB",
-      "____        ____",
-      "          p     ",
+      "GGxxxxxxxxxxxxxx",
+      "Gxxxxxxxxxxxxxxx",
+      "BBBBBBBBBBBBBBBB",
+      "________________",
+      "                ",
+      "              K ",
       "                ",
       "                ",
       "                ",
-      "    K           ",
       "                ",
+      " p              ",
       "                ",
-      "                ",
-      "____        ____",
-      "BBB_        _BBB",
-      "xxB_        _Bxx",
-      "GGB_        _Bxx"
+      "________________",
+      "BBBBBBBBBBBBBBBB",
+      "xxxxxxxxGxxxxxxx",
+      "xxxxxxxGGxxxxxxx"
     ],
     [
-      "F w          wKp",
-      " %            % ",
-      "w w          w w",
+      "%    K   p     %",
+      "  cc      F    p",
+      " w    w      w  ",
       "                ",
       "                ",
       "                ",
@@ -52,14 +52,14 @@
       "                ",
       "                ",
       "                ",
-      "w w          w w",
-      " %            % ",
-      "pKw          w F"
+      "  w    w   w    ",
+      "   zz   F     % ",
+      "%   p       K  %"
     ],
     [
       "                ",
       "                ",
-      "  9          9  ",
+      " 9    9      9  ",
       "                ",
       "                ",
       "                ",
@@ -70,14 +70,13 @@
       "                ",
       "                ",
       "                ",
-      "  9          9  ",
+      "  9    9   9    ",
       "                ",
       "                "
     ],
     [
       "                ",
       "                ",
-      "  g          g  ",
       "                ",
       "                ",
       "                ",
@@ -88,17 +87,10 @@
       "                ",
       "                ",
       "                ",
-      "  g          g  ",
+      "                ",
+      "                ",
       "                ",
       "                "
     ]
-  ],
-  "palette": {
-    "palette": [
-      {
-        "char": ",",
-        "block": "minecraft:white_concrete"
-      }
-    ]
-  }
+  ]
 }

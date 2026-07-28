@@ -4,15 +4,15 @@
   "slices": [
     [
       "bbbb_SSSSSS_bbbb",
-      "bbbb_QQQQQQ_bbbb",
-      "bbbb_SSSSSS_bbbb",
+      "bbbb_,Q,Q,Q_bbbb",
+      "bbbb_,S,S,S_bbbb",
       "bbbb:QQQQQQ_bbbb",
       "____SSSSSSSS:___",
-      "SQSQSvvSSSSGQSQS",
+      "S,,QSvvSSSSGQ,,S",
       "SQSQSvv9SSSSQSQS",
-      "SQSQSvvSSSSSQSQS",
+      "S,,QSvvSSSSSQ,,S",
       "SQSQSSSSSvvvQSQS",
-      "SQSQSSSSWvvvQSQS",
+      "S,,QSSSSWvvvQ,,S",
       "SQSQSGSSSS9SQSQS",
       "___:____________",
       "bbbbbbbbbbbbbbbb",
@@ -92,5 +92,13 @@
       "                ",
       "                "
     ]
-  ]
+  ],
+  "palette": {
+    "palette": [
+      {
+        "char": ",",
+        "block": "minecraft:white_concrete"
+      }
+    ]
+  }
 }

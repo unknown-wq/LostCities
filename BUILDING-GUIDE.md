@@ -74,10 +74,28 @@ it just makes your building silently wrong. Do not rely on a crash to tell you s
 * **This applies only to parts in the storey stack — not to every part.** Nothing sits above a
   `"top": true` part, so a top may be shorter and the shipped ones are: `top4_1` has 4 slices,
   `top4_2` has 3, `top4_3` has 1. Standalone parts placed by their own piece rather than by the
-  storey loop are shorter still — street parts are a single slice, `park_plants` is 1,
-  `park_pool` and `park_trees` are 2. Repo-wide, **60 of the 194 parts have fewer than 6 slices**,
+  storey loop are shorter still — `park_plants` is 1 slice, `park_pool` and `park_trees` are 2,
+  the `street_*` tiles are 5. Repo-wide, **61 of the 224 parts have fewer than 6 slices**,
   and all of them are tops, streets, parks, fountains, bridges, rails or shop interiors. So do not
   pad a street or a roof out to 6 slices to satisfy this rule — check how the part is placed first.
+
+* **Where the origin and the ceiling come from, per family.** A standalone part has no storey
+  pitch to obey, but it does have a budget: its piece writes nothing outside its own bounding box,
+  which is `cellBox(chunkX, chunkZ, groundY, belowGround, aboveGround)` — Y from
+  `groundY - belowGround` to `groundY + aboveGround` inclusive. Slice `i` of the part lands at
+  `originY + i`, so the number of slices you may write is `groundY + aboveGround - originY + 1`.
+  Slices past that are computed and silently thrown away by the `chunkBox.isInside` test.
+  **[verified: `CityPiece.cellBox`, `PartPlacer.place`, and each piece's own constants]**
+
+  | family | placed by | `originY` | box top | slices that fit |
+  |---|---|---|---|---|
+  | storey / cellar | `BuildingPiece` → `BuildingEngine` | ground-floor corner `+ 6 * floor` | `groundY + (floors + 2) * 6 + margin` | exactly 6 (the pitch, not the box, is the limit) |
+  | `street_*` | `StreetPiece.layTile` | `groundY - 1` | `groundY + 6` | 8 — the shipped tiles use 5 |
+  | `park_*`, `fountain*` | `ParkPiece` | `groundY` | `groundY + 8` | 9 — the shipped parts use 1–2 |
+  | `bridge_*` | `BridgePiece` | `groundY - 1` | `groundY + 8` | 10 — `clearDeckVolume` empties `groundY .. groundY + 4` first, so a taller bridge part is free to fill it back in |
+
+  Note the street origin: the tile's slice 0 **replaces** the base course at `groundY - 1` rather
+  than sitting on it, which is why slice 0 is the carriageway and slice 1 is the raised pavement.
 * **`parts2` overlays are the third exception.** A part referenced from a building's `parts2`
   list is meant to be drawn *over* a storey, not stacked as one, so it is a thin furniture layer:
   `shopping11_in_3` is 1 slice, `shopping11_in_1` and `_in_2` are 3. (In the live engine `parts2`
@@ -304,6 +322,39 @@ version for your building. If you define `#` locally you lose the per-city mater
 For `building3` I deliberately left `#`, `}` and `a` undefined locally so they keep coming from the
 style chain, and only declared genuinely new characters.
 
+### If you are not writing a building — **[verified]**
+
+Everything above is about the building path, where there are three layers to put a palette on. A
+`street_*`, `park_*`, `bridge_*` or `fountain*` part is **not** placed by `BuildingEngine`: it is
+stamped by `world/structure/piece/PartPlacer.java` on behalf of `StreetPiece`, `ParkPiece` or
+`BridgePiece`. There is no building above it, so there are exactly **two** layers:
+
+```
+style palettes  ->  the part's own "palette"
+```
+
+`PartPlacer.paletteFor` composes them with `new CompiledPalette(stylePalette, partPalette)` — the
+same call and the same precedence as `BuildingEngine.generatePart`, so a character defined in both
+resolves to the part's version and everything else still comes from the style. Practical
+consequences:
+
+* **A local palette on one of these parts is the only place you can put new characters**, because
+  there is no `buildings/<name>.json` to hang one on and `palettes/*` is shared (§6). Use it: the
+  shipped `street_all` and `street_t` define `,` locally for their crossing paint, and
+  `park_trees` defines `P` for its saplings.
+* **The whole set of style characters is still available**, so a street part can go on using `S`,
+  `Q`, `b`, `_`, `:`, `v`, `x`, `B`, `w`, `9`, `G` exactly as the shipped tiles do.
+* **This was broken until recently.** `PartPlacer` used to ignore the part's palette entirely, so
+  every character only it defined resolved to `null`, which the placer reads as "leave the world
+  alone" — the blocks did not error, they simply were not there. If you are reading an old part
+  whose local palette appears to do nothing, that is why. `StreetTilesTest` pins the fix.
+* **`"refpalette"` works here too, and is the same slot.** `Assets` runs
+  `BuildingPart.resolveLocalPalette` once at load and turns a `refpalette` name into the part's
+  local palette, so a part has *either* an inline `"palette"` *or* a `"refpalette"`, never both —
+  and whichever it is, that is the layer `PartPlacer` puts over the style. A `refpalette` naming a
+  palette no style rolls (`rails`, `oilrig`) is a legitimate way to give one part a private
+  vocabulary without touching a shared file.
+
 ### Which characters are already taken
 
 A style is a list of *groups*; one palette is chosen per group and all of them merged
@@ -400,6 +451,29 @@ local palette or a new part file instead.
 9. **Spawners and loot are wired through `conditions/`, not directly.** `"loot": "chestloot"`,
    `"mob": "easymobs"`. Passing a loot **table id** there does not work.
 
+9a. **On the `PartPlacer` path, a `"mob"` entry places nothing at all.** Not "an empty spawner" —
+   nothing:
+   ```java
+   // world/structure/piece/PartPlacer.place
+   Palette.Info info = resolved.getInfo(c);
+   if (info != null && info.mobId() != null && !info.mobId().isEmpty()) {
+       continue;   // no spawners in street furniture (see class javadoc)
+   }
+   ```
+   This is deliberate and documented in that class's javadoc: streets, parks and bridges are
+   scenery, and a spawner in the middle of a road is not scenery. The check is on the character's
+   `Info`, not on the block, so it also swallows `1` and `4` from `common.json` — if you want a
+   block there, define the character locally without a `"mob"` field. **[verified]**
+
+9b. **On the `PartPlacer` path, `"loot"` and `"tag"` are dropped.** `PartPlacer` calls
+   `level.setBlock` and stops; it never builds the block-entity compound that
+   `BuildingEngine.generatePart` builds (`blockEntityTag(...)` → `attachBlockEntity(...)` for
+   `inf.tag() != null || loot != null`). So a `C` chest in a park part generates as a **real but
+   empty chest**, and the furnace char `;`, which carries a `tag` with ten coal, generates empty
+   too. That is a deliberate simplification, not an oversight — an empty chest is a better failure
+   than a worldgen crash — but do not design a street or park part around loot. **[verified:
+   `PartPlacer.place` has no block-entity path; `BuildingEngine.java:436-441` has one]**
+
 10. **`" "` does not delete.** See §2. Relevant if you ever write a part that is meant to hollow
     something out.
 
@@ -416,37 +490,60 @@ local palette or a new part file instead.
 
 ## 8. Verification recipe
 
-Nothing in the JUnit suite checks datapack geometry, so this script *is* the check. Run it before
-you report anything. Save it outside the repo (a scratch dir) — it is a tool, not an artefact.
+`src/test/java/com/lostbuildings/data/DatapackGeometryTest.java` now walks the whole shipped
+datapack on every `gradle build` — slice geometry, storey slice counts, part-reference resolution
+and the 128-slot weight rule. Run it (`gradle test --tests '*DatapackGeometryTest'`) and keep it
+green; do not edit it to accommodate your asset.
+
+This script is still worth having while you iterate: it is scoped to the one thing you are working
+on, it names free characters, and it is faster than a Gradle round trip. Save it outside the repo
+(a scratch dir) — it is a tool, not an artefact.
+
+**It works with or without a building.** Pass a building name (`verify.py building3`) and it checks
+the building and its parts as before. Pass anything else (`verify.py street`, `verify.py park`,
+`verify.py bridge`) and it switches to *part family mode*: it globs `parts/<name>*.json`, drops the
+storey six-slice rule and the part-reference check — neither applies to a family with no building —
+and resolves each part's characters against the style-guaranteed set plus **that part's own**
+`"palette"` or `"refpalette"`, which is the real layering on the `PartPlacer` path (§5).
 
 ```python
 #!/usr/bin/env python3
-"""Verify a lostcities building: JSON parse, 16x16 geometry, undefined chars.
-Usage: python3 verify.py building3
+"""Verify a lostcities asset: JSON parse, 16x16 geometry, undefined chars.
+
+Usage: python3 verify.py building3      # a building and its parts
+       python3 verify.py street         # a part family with no building at all
 """
 import json, glob, os, sys, collections
 
 BASE = "/home/user/LostCities/lostbuildings/src/main/resources/data/lostbuildings/lostcities"
 NAME = sys.argv[1] if len(sys.argv) > 1 else "building3"
+BLD = os.path.join(BASE, "buildings", NAME + ".json")
+HAS_BUILDING = os.path.exists(BLD)
 ok = True
 
 # --- 1. every file parses -------------------------------------------------
-files = sorted(glob.glob(os.path.join(BASE, "parts", NAME + "_*.json")))
-files.append(os.path.join(BASE, "buildings", NAME + ".json"))
+files = sorted(glob.glob(os.path.join(BASE, "parts", NAME + "*.json")))
+if HAS_BUILDING:
+    files.append(BLD)
+elif not files:
+    sys.exit("no buildings/%s.json and no parts/%s*.json -- nothing to check" % (NAME, NAME))
 docs = {}
 for f in files:
     try:
         docs[f] = json.load(open(f))
     except Exception as e:
         ok = False; print("PARSE FAIL", f, e)
-print("1. JSON parse: %d/%d OK" % (len(docs), len(files)))
-bld = docs[os.path.join(BASE, "buildings", NAME + ".json")]
+print("1. JSON parse: %d/%d OK%s" % (len(docs), len(files),
+      "" if HAS_BUILDING else "  (no building: part family mode)"))
+bld = docs[BLD] if HAS_BUILDING else None
 
 # --- 2. geometry: xsize x zsize, storey-stack slice counts ----------------
 # Only the storey stack must be 6 slices (see section 2): parts referenced from
 # "parts" without "top": true. Tops sit above everything and parts2 entries are
 # overlays, so both may legitimately be shorter -- reported, never failed.
-storey = {p["part"] for p in bld["parts"] if p.get("top") is not True}
+# With no building there is no storey stack, so every part is "other": a street,
+# park or bridge part is bounded by its piece's box, not by the storey pitch.
+storey = {p["part"] for p in bld["parts"] if p.get("top") is not True} if bld else set()
 counts, other = {}, {}
 for f, d in docs.items():
     if "slices" not in d:
@@ -460,13 +557,20 @@ for f, d in docs.items():
             if len(row) != xs:
                 ok = False; print("  BAD row length", base, si, zi, len(row), repr(row))
 print("2. geometry: storey parts =", sorted(set(counts.values())),
-      " tops/overlays =", sorted(set(other.values())))
-if set(counts.values()) != {6}:
+      " tops/overlays/standalone =", sorted(set(other.values())))
+if counts and set(counts.values()) != {6}:
     ok = False; print("  STOREY PARTS MUST ALL BE 6 SLICES:", counts)
 
 # --- 3. every char is defined --------------------------------------------
 def pal_chars(p):
     return {e["char"] for e in json.load(open(p))["palette"]}
+
+def local_chars(d):
+    """The chars an inline "palette" or a "refpalette" gives one file."""
+    chars = {e["char"] for e in d.get("palette", {}).get("palette", [])}
+    if "refpalette" in d:
+        chars |= pal_chars(os.path.join(BASE, "palettes", d["refpalette"] + ".json"))
+    return chars
 
 # a char is guaranteed only if EVERY palette in its random group defines it
 guaranteed = None
@@ -480,26 +584,38 @@ for st in ["standard", "desert", "snowy", "swamp", "standard_border"]:
         g |= inter
     guaranteed = g if guaranteed is None else guaranteed & g
 
-local = {e["char"] for e in bld.get("palette", {}).get("palette", [])}
-known = guaranteed | local
+bld_local = local_chars(bld) if bld else set()
 used, where = collections.Counter(), collections.defaultdict(set)
+undefined = []
 for f, d in docs.items():
+    known_here = guaranteed | bld_local | local_chars(d)
     for s in d.get("slices", []):
         for row in s:
             for ch in row:
                 used[ch] += 1; where[ch].add(os.path.basename(f))
-print("3. palette: local=%s" % "".join(sorted(local)))
+                if ch not in known_here:
+                    undefined.append((ch, os.path.basename(f)))
+part_local = set()
+for f, d in docs.items():
+    if f != BLD:
+        part_local |= local_chars(d)
+print("3. palette: building-local=%s  part-local=%s" % (
+      "".join(sorted(bld_local)), "".join(sorted(part_local))))
 print("   free chars still available: %s" %
-      "".join(sorted(chr(c) for c in range(33, 127) if chr(c) not in known)))
-for c in sorted(c for c in used if c not in known):
-    ok = False; print("   UNDEFINED %r used in %s" % (c, sorted(where[c])))
-for c in sorted(c for c in local if c not in used):
+      "".join(sorted(chr(c) for c in range(33, 127)
+                     if chr(c) not in guaranteed | bld_local)))
+for ch, f in sorted(set(undefined)):
+    ok = False; print("   UNDEFINED %r used in %s" % (ch, f))
+for c in sorted(c for c in bld_local if c not in used):
     print("   note: local char %r defined but never used" % c)
 
 # --- 4. referenced parts exist -------------------------------------------
-for r in [p["part"] for p in bld["parts"]]:
-    if not os.path.exists(os.path.join(BASE, "parts", r + ".json")):
-        ok = False; print("   MISSING PART", r)
+if bld:
+    for r in [p["part"] for p in bld["parts"]]:
+        if not os.path.exists(os.path.join(BASE, "parts", r + ".json")):
+            ok = False; print("   MISSING PART", r)
+else:
+    print("4. part refs: no building, nothing to resolve")
 
 print("\nRESULT:", "ALL CHECKS PASSED" if ok else "FAILURES ABOVE")
 sys.exit(0 if ok else 1)

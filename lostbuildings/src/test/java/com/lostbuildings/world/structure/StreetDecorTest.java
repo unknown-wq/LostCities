@@ -89,6 +89,147 @@ class StreetDecorTest {
 		}
 	}
 
+	// ------------------------------------------------------------------ crossings (defect 3)
+
+	/**
+	 * Crossings belong to junctions. Everything else — a straight run, a bend, a dead end, an island —
+	 * gets an unbroken kerb, which is why {@link #aStraightRoadHasExactlyTwoKerbRows} is untouched by
+	 * any of this.
+	 */
+	@Test
+	void onlyJunctionsHaveCrossings() {
+		for (int mask = 0; mask < 16; mask++) {
+			boolean junction = Integer.bitCount(mask) >= 3;
+			boolean any = false;
+			for (int dx = 0; dx < 16 && !any; dx++) {
+				for (int dz = 0; dz < 16 && !any; dz++) {
+					any = StreetDecor.isCrossing(dx, dz, mask);
+				}
+			}
+			assertEquals(junction, any, "mask " + mask + ": crossings where there should be none, or none where there should be");
+		}
+		for (int d = 0; d < 16; d++) {
+			assertFalse(StreetDecor.isDroppedKerb(d, 3, W | E), "a straight run keeps its whole kerb");
+			assertFalse(StreetDecor.isDroppedKerb(d, 12, W | E));
+		}
+	}
+
+	/** A dropped kerb is a kerb first: the crossing never eats into the carriageway or the pavement. */
+	@Test
+	void everyDroppedKerbIsAKerb() {
+		for (int mask = 0; mask < 16; mask++) {
+			int dropped = 0;
+			for (int dx = 0; dx < 16; dx++) {
+				for (int dz = 0; dz < 16; dz++) {
+					if (!StreetDecor.isDroppedKerb(dx, dz, mask)) {
+						continue;
+					}
+					dropped++;
+					assertTrue(StreetDecor.isKerb(dx, dz, mask),
+							"mask " + mask + ": (" + dx + "," + dz + ") is dropped but is not a kerb");
+				}
+			}
+			// Two ends to every crossing band, two columns deep, one band per arm.
+			assertEquals(Integer.bitCount(mask) >= 3 ? 4 * Integer.bitCount(mask) : 0, dropped,
+					"mask " + mask + " dropped the wrong number of kerbstones");
+		}
+	}
+
+	/** A junction still has far more raised kerb than dropped: the ring is broken, not removed. */
+	@Test
+	void aCrossingBreaksTheKerbRingRatherThanReplacingIt() {
+		int kerbs = 0;
+		int dropped = 0;
+		for (int dx = 0; dx < 16; dx++) {
+			for (int dz = 0; dz < 16; dz++) {
+				if (StreetDecor.isKerb(dx, dz, CityLayout.ALL_SIDES)) {
+					kerbs++;
+				}
+				if (StreetDecor.isDroppedKerb(dx, dz, CityLayout.ALL_SIDES)) {
+					dropped++;
+				}
+			}
+		}
+		assertEquals(28, kerbs, "a crossroads kerbs the four corner squares in an L each");
+		assertEquals(16, dropped, "a crossroads has four crossings, four kerbstones each");
+
+		// What is left has to be the parts that make a junction read as one: the corner nearest the
+		// carriageway, and the far end of each leg where the kerb runs on into the next cell.
+		for (int corner : new int[]{3, 12}) {
+			for (int other : new int[]{3, 12}) {
+				assertFalse(StreetDecor.isDroppedKerb(corner, other, CityLayout.ALL_SIDES),
+						"the inner corner (" + corner + "," + other + ") must keep its kerbstone");
+			}
+		}
+		assertFalse(StreetDecor.isDroppedKerb(3, 0, CityLayout.ALL_SIDES), "the kerb still meets the cell edge");
+		assertFalse(StreetDecor.isDroppedKerb(0, 3, CityLayout.ALL_SIDES));
+	}
+
+	/**
+	 * The property the design leans on, asserted rather than asserted-in-a-comment.
+	 *
+	 * <p>The crossing bands are drawn by the {@code street_*} parts in their own unrotated frame and
+	 * read back here in cell coordinates. That only works because the set of bands is invariant under a
+	 * quarter turn — turn the cell and its mask together and every crossing column lands on a crossing
+	 * column. If it ever stops being true, a turned junction paints its zebra where the kerb is still
+	 * raised, which is exactly the defect this replaced.
+	 */
+	@Test
+	void theCrossingBandsTurnWithTheTile() {
+		for (int mask = 0; mask < 16; mask++) {
+			for (int turns = 1; turns < 4; turns++) {
+				int turnedMask = rotateMask(mask, turns);
+				for (int dx = 0; dx < 16; dx++) {
+					for (int dz = 0; dz < 16; dz++) {
+						assertEquals(StreetDecor.isCrossing(dx, dz, mask),
+								StreetDecor.isCrossing(rotateX(dx, dz, turns), rotateZ(dx, dz, turns), turnedMask),
+								"mask " + mask + " turned " + turns + " at (" + dx + "," + dz + ")");
+					}
+				}
+			}
+		}
+	}
+
+	/** Clockwise quarter turns of a 16x16 cell, matching {@code engine.Transform}. */
+	private static int rotateX(int dx, int dz, int turns) {
+		return switch (Math.floorMod(turns, 4)) {
+			case 1 -> 15 - dz;
+			case 2 -> 15 - dx;
+			case 3 -> dz;
+			default -> dx;
+		};
+	}
+
+	private static int rotateZ(int dx, int dz, int turns) {
+		return switch (Math.floorMod(turns, 4)) {
+			case 1 -> dx;
+			case 2 -> 15 - dz;
+			case 3 -> 15 - dx;
+			default -> dz;
+		};
+	}
+
+	private static int rotateMask(int mask, int turns) {
+		int result = mask;
+		for (int i = 0; i < Math.floorMod(turns, 4); i++) {
+			int next = 0;
+			if ((result & N) != 0) {
+				next |= E;
+			}
+			if ((result & E) != 0) {
+				next |= S;
+			}
+			if ((result & S) != 0) {
+				next |= W;
+			}
+			if ((result & W) != 0) {
+				next |= N;
+			}
+			result = next;
+		}
+		return result;
+	}
+
 	/** Lamps stand on kerbs, never anywhere else, and never when the spacing knob is off. */
 	@Test
 	void lampsOnlyEverStandOnKerbs() {

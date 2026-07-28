@@ -1,5 +1,6 @@
 package com.lostbuildings.world.structure.piece;
 
+import com.lostbuildings.LostBuildings;
 import com.lostbuildings.engine.BlockStates;
 import com.lostbuildings.engine.BuildingPart;
 import com.lostbuildings.engine.CompiledPalette;
@@ -27,6 +28,14 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
  * {@code structure_void} all mean "leave the world alone here" — that is how the shipped tiles
  * express pavement, which must not overwrite the base course laid underneath. Rotation is applied to
  * both the coordinates and the block state, so stairs and slabs turn with the tile.
+ *
+ * <p><b>A part's own {@code "palette"} block is honoured</b>, exactly as
+ * {@code BuildingEngine.generatePart} honours it: the part-local palette is layered <em>over</em> the
+ * style palette it is handed, so a character defined in both resolves to the part's version and every
+ * other character still comes from the style. Until this was wired up a {@code "palette"} on a
+ * {@code street_*}/{@code park_*}/{@code bridge_*}/{@code fountain*} part was inert — every character
+ * only it defined resolved to {@code null}, which this class reads as air, so the blocks silently
+ * vanished.
  *
  * <p><b>Deliberately simpler than the engine</b> (§9): a decorative part gets no spawners and no
  * loot-table NBT. Every shipped {@code street_*}, {@code park_*}, {@code fountain*} and
@@ -58,6 +67,7 @@ public final class PartPlacer {
 		if (part == null || palette == null) {
 			return originY;
 		}
+		CompiledPalette resolved = paletteFor(part, palette);
 		int xSize = part.getXSize();
 		int zSize = part.getZSize();
 		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
@@ -72,11 +82,11 @@ public final class PartPlacer {
 				int rz = transform.rotateZ(x, z, xSize, zSize);
 				for (int y = 0; y < column.length; y++) {
 					char c = column[y];
-					BlockState state = palette.get(c, rand);
+					BlockState state = resolved.get(c, rand);
 					if (state == null || state == BlockStates.AIR || state == BlockStates.STRUCTURE_VOID) {
 						continue;   // unknown, air or void: leave whatever is already there
 					}
-					Palette.Info info = palette.getInfo(c);
+					Palette.Info info = resolved.getInfo(c);
 					if (info != null && info.mobId() != null && !info.mobId().isEmpty()) {
 						continue;   // no spawners in street furniture (see class javadoc)
 					}
@@ -96,5 +106,35 @@ public final class PartPlacer {
 			}
 		}
 		return originY + part.getSliceCount();
+	}
+
+	/**
+	 * The palette a part's characters actually resolve against: its own {@code "palette"} block
+	 * layered over the style palette, or the style palette unchanged when it declares none.
+	 *
+	 * <p>Same composition and same precedence as {@code BuildingEngine.generatePart} — that method
+	 * calls {@code derive(basePalette, partPalette)}, which is {@code new CompiledPalette(base, extra)},
+	 * and {@code CompiledPalette}'s copy constructor copies the base and then adds the extra, so the
+	 * later (part-local) entry wins for a character both define. Getting that order backwards would
+	 * make a local palette unable to <em>re</em>define anything, which is most of what one is for.
+	 *
+	 * <p>Not cached, unlike the engine's version. The engine derives once per storey per building and
+	 * caches to keep that off the hot path; a decorative part is stamped once per cell, so one 128-slot
+	 * array copy per cell is cheaper than a static cache that would keep every world's palettes alive.
+	 *
+	 * @return never {@code null} when {@code base} is not {@code null}
+	 */
+	public static CompiledPalette paletteFor(BuildingPart part, CompiledPalette base) {
+		if (part == null || base == null) {
+			return base;
+		}
+		// BuildingPart resolves its local palette at construction and ignores the argument; it is
+		// passed for the same reason the engine passes it, so a future IBuildingPart that needs the
+		// asset registry to resolve one keeps working.
+		Palette local = part.getLocalPalette(LostBuildings.ASSETS);
+		if (local == null) {
+			return base;
+		}
+		return new CompiledPalette(base, local);
 	}
 }
