@@ -67,11 +67,17 @@ it just makes your building silently wrong. Do not rely on a crash to tell you s
 * For city buildings that is **16x16**.
 * **A slice is one Y layer, listed bottom to top.** Slice `i` lands at `origin.y + height + i`
   [verified: `BuildingEngine.generatePart`, `origin.offset(rx, oy + y, rz)`].
-* **All parts of one building must have the same slice count**, because the engine advances by a
+* **Every *stacked storey* part must have exactly 6 slices**, because the engine advances by a
   fixed `FLOORHEIGHT = 6` per storey and ignores the part's own height
-  [verified: `BuildingEngine.java:56`, `int height = f * FLOORHEIGHT;`]. Every shipped city
-  building part has exactly **6 slices**. If you write 5 you get a 1-block gap; if you write 7 the
-  7th layer is overwritten by the next storey.
+  [verified: `BuildingEngine.java:56`, `int height = f * FLOORHEIGHT;`]. If you write 5 you get a
+  1-block gap; if you write 7 the 7th layer is overwritten by the next storey.
+* **This applies only to parts in the storey stack — not to every part.** Nothing sits above a
+  `"top": true` part, so a top may be shorter and the shipped ones are: `top4_1` has 4 slices,
+  `top4_2` has 3, `top4_3` has 1. Standalone parts placed by their own piece rather than by the
+  storey loop are shorter still — street parts are a single slice, `park_plants` is 1,
+  `park_pool` and `park_trees` are 2. Repo-wide, **60 of the 194 parts have fewer than 6 slices**,
+  and all of them are tops, streets, parks, fountains, bridges, rails or shop interiors. So do not
+  pad a street or a roof out to 6 slices to satisfy this rule — check how the part is placed first.
 
 ### Orientation — **[verified]**
 

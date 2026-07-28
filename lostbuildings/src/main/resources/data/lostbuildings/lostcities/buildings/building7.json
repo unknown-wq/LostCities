@@ -1,48 +1,479 @@
 {
   "filler": "#",
   "rubble": "}",
+  "mincellars": 1,
+  "maxcellars": 1,
   "palette": {
     "palette": [
       {
         "char": "#",
-        "variant": "blackstone",
+        "blocks": [
+          {
+            "random": 40,
+            "block": "minecraft:bricks"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:brown_terracotta"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:granite"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:red_terracotta"
+          }
+        ],
         "damaged": "minecraft:iron_bars"
       },
       {
         "char": "}",
-        "variant": "blackstone_rubble",
+        "blocks": [
+          {
+            "random": 30,
+            "block": "minecraft:gravel"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:bricks"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:coarse_dirt"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:granite"
+          }
+        ],
         "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "0",
+        "block": "minecraft:polished_granite",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "2",
+        "block": "minecraft:dark_oak_planks",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "3",
+        "block": "minecraft:spruce_planks",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "5",
+        "block": "minecraft:dark_oak_slab[type=top]"
+      },
+      {
+        "char": "6",
+        "block": "minecraft:spruce_slab[type=top]"
+      },
+      {
+        "char": "7",
+        "block": "minecraft:polished_granite_slab[type=bottom]"
+      },
+      {
+        "char": "8",
+        "block": "minecraft:red_nether_bricks",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "e",
+        "blocks": [
+          {
+            "random": 40,
+            "block": "minecraft:mossy_cobblestone"
+          },
+          {
+            "random": 30,
+            "block": "minecraft:cobblestone"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:cracked_stone_bricks"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:stone_bricks"
+          }
+        ],
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "f",
+        "block": "minecraft:granite",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "<",
+        "block": "minecraft:dark_oak_stairs[facing=west,half=bottom,shape=straight]"
+      },
+      {
+        "char": ">",
+        "block": "minecraft:dark_oak_stairs[facing=east,half=bottom,shape=straight]"
+      },
+      {
+        "char": "^",
+        "block": "minecraft:dark_oak_stairs[facing=north,half=bottom,shape=straight]"
+      },
+      {
+        "char": "V",
+        "block": "minecraft:dark_oak_stairs[facing=south,half=bottom,shape=straight]"
+      },
+      {
+        "char": "P",
+        "block": "minecraft:polished_granite_stairs[facing=north,half=top,shape=straight]"
+      },
+      {
+        "char": "J",
+        "block": "minecraft:polished_granite_stairs[facing=south,half=top,shape=straight]"
+      },
+      {
+        "char": "I",
+        "block": "minecraft:polished_granite_stairs[facing=east,half=top,shape=straight]"
+      },
+      {
+        "char": "U",
+        "block": "minecraft:polished_granite_stairs[facing=west,half=top,shape=straight]"
+      },
+      {
+        "char": "q",
+        "block": "minecraft:iron_block",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "o",
+        "block": "minecraft:copper_block",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "r",
+        "block": "minecraft:cut_copper",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "Q",
+        "block": "minecraft:exposed_copper",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "E",
+        "block": "minecraft:iron_trapdoor[facing=north,half=bottom,open=true,powered=false,waterlogged=false]"
+      },
+      {
+        "char": "H",
+        "block": "minecraft:iron_trapdoor[facing=south,half=bottom,open=true,powered=false,waterlogged=false]"
+      },
+      {
+        "char": ",",
+        "block": "minecraft:iron_trapdoor[facing=east,half=bottom,open=true,powered=false,waterlogged=false]"
+      },
+      {
+        "char": "'",
+        "block": "minecraft:iron_trapdoor[facing=west,half=bottom,open=true,powered=false,waterlogged=false]"
+      },
+      {
+        "char": "\"",
+        "block": "minecraft:iron_trapdoor[facing=north,half=top,open=false,powered=false,waterlogged=false]"
+      },
+      {
+        "char": "?",
+        "block": "minecraft:observer[facing=north,powered=false]"
+      },
+      {
+        "char": ";",
+        "block": "minecraft:observer[facing=south,powered=false]"
+      },
+      {
+        "char": "[",
+        "block": "minecraft:observer[facing=west,powered=false]"
+      },
+      {
+        "char": "]",
+        "block": "minecraft:observer[facing=east,powered=false]"
+      },
+      {
+        "char": "(",
+        "block": "minecraft:observer[facing=up,powered=false]"
+      },
+      {
+        "char": "|",
+        "block": "minecraft:lightning_rod[facing=up,powered=false]"
+      },
+      {
+        "char": "R",
+        "block": "minecraft:hopper[facing=down,enabled=true]"
+      },
+      {
+        "char": "u",
+        "block": "minecraft:cauldron"
+      },
+      {
+        "char": "c",
+        "blocks": [
+          {
+            "random": 25,
+            "block": "minecraft:blast_furnace[facing=north]"
+          },
+          {
+            "random": 22,
+            "block": "minecraft:smoker[facing=north]"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:furnace[facing=north]"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:dropper[facing=north]"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:dispenser[facing=north]"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:copper_block"
+          }
+        ]
+      },
+      {
+        "char": "d",
+        "blocks": [
+          {
+            "random": 45,
+            "block": "minecraft:air"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:coarse_dirt"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:bricks"
+          }
+        ]
+      },
+      {
+        "char": "v",
+        "blocks": [
+          {
+            "random": 30,
+            "block": "minecraft:cobweb"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:gravel"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:coarse_dirt"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:air"
+          }
+        ]
+      },
+      {
+        "char": "s",
+        "blocks": [
+          {
+            "random": 30,
+            "block": "minecraft:barrel[facing=up]"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:bookshelf"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:chiseled_bookshelf"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:cartography_table"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:barrel[facing=up]"
+          }
+        ]
+      },
+      {
+        "char": "O",
+        "blocks": [
+          {
+            "random": 25,
+            "block": "minecraft:crafting_table"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:loom"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:smithing_table"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:stonecutter"
+          },
+          {
+            "random": 12,
+            "block": "minecraft:cauldron"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:cobweb"
+          }
+        ]
+      },
+      {
+        "char": "&",
+        "block": "minecraft:barrel[facing=up]",
+        "loot": "chestloot"
+      },
+      {
+        "char": "k",
+        "block": "minecraft:red_carpet"
+      },
+      {
+        "char": "m",
+        "block": "minecraft:brown_carpet"
+      },
+      {
+        "char": "A",
+        "block": "minecraft:orange_carpet"
+      },
+      {
+        "char": "Y",
+        "block": "minecraft:red_wool"
+      },
+      {
+        "char": "M",
+        "block": "minecraft:red_bed[facing=north,part=head,occupied=false]"
+      },
+      {
+        "char": "N",
+        "block": "minecraft:red_bed[facing=north,part=foot,occupied=false]"
+      },
+      {
+        "char": "t",
+        "block": "minecraft:dark_oak_door[facing=north,half=lower,hinge=left,open=false,powered=false]"
+      },
+      {
+        "char": "z",
+        "block": "minecraft:dark_oak_door[facing=north,half=upper,hinge=left,open=false,powered=false]"
+      },
+      {
+        "char": "/",
+        "block": "minecraft:dark_oak_fence"
+      },
+      {
+        "char": "X",
+        "blocks": [
+          {
+            "random": 25,
+            "block": "minecraft:potted_red_tulip"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:potted_orange_tulip"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:potted_fern"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:potted_oak_sapling"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:potted_dead_bush"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:flower_pot"
+          }
+        ]
+      },
+      {
+        "char": "i",
+        "block": "minecraft:lantern[hanging=false]"
+      },
+      {
+        "char": "n",
+        "block": "minecraft:lantern[hanging=true]"
+      },
+      {
+        "char": "j",
+        "block": "minecraft:soul_lantern[hanging=true]"
       }
     ]
   },
   "parts": [
     {
+      "part": "building7_cellar",
+      "cellar": true
+    },
+    {
+      "part": "building7_ground",
+      "ground": true,
+      "top": false
+    },
+    {
+      "part": "building7_1",
       "top": false,
-      "part": "building4_1"
+      "ground": false,
+      "cellar": false
     },
     {
+      "part": "building7_2",
       "top": false,
-      "part": "building4_2"
+      "ground": false,
+      "cellar": false,
+      "range": "1,16"
     },
     {
+      "part": "building7_3",
       "top": false,
-      "part": "building4_3"
+      "ground": false,
+      "cellar": false,
+      "range": "1,4"
     },
     {
+      "part": "building7_4",
       "top": false,
-      "part": "building4_4"
+      "ground": false,
+      "cellar": false,
+      "range": "2,16"
     },
     {
-      "top": true,
-      "part": "top4_1"
+      "part": "building7_5",
+      "top": false,
+      "ground": false,
+      "cellar": false,
+      "range": "2,16"
     },
     {
-      "top": true,
-      "part": "top4_2"
+      "part": "building7_6",
+      "top": false,
+      "ground": false,
+      "cellar": false
     },
     {
-      "top": true,
-      "part": "top4_3"
+      "part": "building7_top",
+      "top": true
+    },
+    {
+      "part": "building7_top2",
+      "top": true
     }
   ]
 }
