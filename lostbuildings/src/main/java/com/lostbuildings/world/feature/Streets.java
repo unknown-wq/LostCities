@@ -33,8 +33,19 @@ public final class Streets {
 	public static final BlockState DEFAULT_STREET = Blocks.STONE_BRICKS.defaultBlockState();
 
 	private static final BlockState AIR = Blocks.AIR.defaultBlockState();
-	/** Headroom cleared above the road surface. */
+	/** Headroom cleared above the road surface, even where the terrain is already lower. */
 	private static final int CLEARANCE = 3;
+	/**
+	 * How far above the road the terrain may be dug away when the cell's ground sits higher than the
+	 * city's shared level.
+	 *
+	 * <p>Buildings have always excavated what stands above them ({@code BuildingPiece.clearHeight}
+	 * carries a 64-block allowance); streets cleared a flat {@link #CLEARANCE} and nothing more, so
+	 * on any city whose level fell below the surrounding surface the roads stayed entombed while the
+	 * houses around them stood in open pits. The cap keeps a road from carving a trench through a
+	 * mountainside: past it the cell is left alone rather than mined out.
+	 */
+	private static final int MAX_HEADROOM = 24;
 	/** How far the road may be carried on fill before the column is abandoned. */
 	private static final int MAX_EMBANKMENT = 8;
 
@@ -84,8 +95,11 @@ public final class Streets {
 		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
 
 		if (setIfInside(level, chunkBox, cursor.set(x, surfaceY, z), surface)) {
-			// Headroom: grass, snow layers, flowers and any terrain that the shared level cuts into.
-			for (int cy = groundY; cy < groundY + CLEARANCE; cy++) {
+			// Headroom: grass, snow layers, flowers, and any terrain standing above the shared level
+			// — up to MAX_HEADROOM, so a road that runs below the surrounding surface is dug out
+			// instead of being left buried under it.
+			int headroom = Math.min(Math.max(CLEARANCE, terrainTop - surfaceY), MAX_HEADROOM);
+			for (int cy = groundY; cy < groundY + headroom; cy++) {
 				cursor.set(x, cy, z);
 				if (!level.getBlockState(cursor).isAir()) {
 					setIfInside(level, chunkBox, cursor, AIR);

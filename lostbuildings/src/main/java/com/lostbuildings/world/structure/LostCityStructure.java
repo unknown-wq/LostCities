@@ -166,20 +166,23 @@ public class LostCityStructure extends Structure {
 	}
 
 	/**
-	 * One ground level for the whole city: the lowest terrain height across the corners of every
-	 * built-on cell, snapped down to a multiple of the storey height.
+	 * One ground level for the whole city: the <em>median</em> terrain height across the corners of
+	 * every built-on cell, snapped to the nearest multiple of the storey height.
 	 *
-	 * <p>Taking the minimum means the city is cut into a slope rather than left standing on stilts
-	 * over it — the same rule the group placement used, now applied over a whole city instead of a
-	 * five-cell star. The samples come from {@link ChunkGenerator#getFirstOccupiedHeight}, which
-	 * evaluates the terrain noise directly, so no chunk has to exist and the answer is identical no
-	 * matter which chunk triggered the start. Street cells are excluded on purpose: a street that
-	 * happens to cross a river would otherwise drag the whole city down to the river bed, and a
-	 * street over water is a bridge anyway.
+	 * <p>The samples come from {@link ChunkGenerator#getFirstOccupiedHeight}, which evaluates the
+	 * terrain noise directly, so no chunk has to exist and the answer is identical no matter which
+	 * chunk triggered the start. Street cells are excluded on purpose: a street that happens to
+	 * cross a river would otherwise drag the level down to the river bed, and a street over water is
+	 * a bridge anyway.
+	 *
+	 * <p>The statistic itself lives in {@link CityLayout#groundLevelFrom} — it is pure, so it is
+	 * unit-tested there, including the regression this replaced (a minimum over a 144-block-wide
+	 * city sinks the whole settlement to its deepest sample and buries the streets).
 	 */
 	private static int groundLevel(Structure.GenerationContext context, CityLayout.Plan plan) {
 		ChunkGenerator generator = context.chunkGenerator();
-		int lowest = Integer.MAX_VALUE;
+		int[] samples = new int[plan.cells().size() * CELL_CORNERS.length];
+		int n = 0;
 		for (CityLayout.Cell cell : plan.cells()) {
 			if (cell.role() == CityLayout.Role.STREET) {
 				continue;
@@ -187,15 +190,15 @@ public class LostCityStructure extends Structure {
 			int x0 = cell.chunkX() << 4;
 			int z0 = cell.chunkZ() << 4;
 			for (int[] corner : CELL_CORNERS) {
-				lowest = Math.min(lowest, generator.getFirstOccupiedHeight(
+				samples[n++] = generator.getFirstOccupiedHeight(
 						x0 + corner[0], z0 + corner[1], Heightmap.Types.WORLD_SURFACE_WG,
-						context.heightAccessor(), context.randomState()));
+						context.heightAccessor(), context.randomState());
 			}
 		}
-		if (lowest == Integer.MAX_VALUE) {
-			lowest = generator.getSeaLevel();
-		}
-		return Math.floorDiv(lowest, LostCityConfig.FLOOR_HEIGHT) * LostCityConfig.FLOOR_HEIGHT;
+		int level = CityLayout.groundLevelFrom(java.util.Arrays.copyOf(samples, n), LostCityConfig.FLOOR_HEIGHT);
+		return level == Integer.MIN_VALUE
+				? Math.floorDiv(generator.getSeaLevel(), LostCityConfig.FLOOR_HEIGHT) * LostCityConfig.FLOOR_HEIGHT
+				: level;
 	}
 
 	/**

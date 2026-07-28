@@ -426,4 +426,56 @@ class CityLayoutTest {
 			assertTrue(u >= 0.0D && u < 1.0D, "unit() out of range: " + u);
 		}
 	}
+
+	/**
+	 * The regression this statistic exists for: a city was generated at y≈49 with everything buried,
+	 * because the level was the <em>minimum</em> over samples spanning 144×144 blocks and one deep
+	 * spot (ravine, pond, cliff foot) decided the height for the whole settlement.
+	 */
+	@Test
+	void oneDeepSampleDoesNotSinkTheCity() {
+		int[] samples = new int[41];
+		for (int i = 0; i < 40; i++) {
+			samples[i] = 70;
+		}
+		samples[40] = 20;   // the ravine that used to win
+
+		int level = CityLayout.groundLevelFrom(samples, 6);
+
+		assertTrue(level >= 66, "one deep sample sank the city to y=" + level);
+		assertTrue(level <= 72, "level drifted above the terrain: y=" + level);
+	}
+
+	/** Half the lots may sit in a hole and the level still lands on the terrain the city stands on. */
+	@Test
+	void medianSurvivesHalfTheSamplesBeingOutliers() {
+		int[] samples = {20, 20, 20, 20, 70, 72, 71, 70, 70};
+
+		int level = CityLayout.groundLevelFrom(samples, 6);
+
+		assertTrue(level >= 66, "median was dragged down to y=" + level);
+	}
+
+	/** Snapping is to the nearest storey boundary, not always downward. */
+	@Test
+	void snapsToNearestStoreyBoundary() {
+		assertEquals(72, CityLayout.groundLevelFrom(new int[]{70}, 6));
+		assertEquals(66, CityLayout.groundLevelFrom(new int[]{67}, 6));
+		assertEquals(66, CityLayout.groundLevelFrom(new int[]{66}, 6));
+	}
+
+	/** No samples is the caller's cue to fall back to sea level, not a silent zero. */
+	@Test
+	void emptySampleSetIsSignalled() {
+		assertEquals(Integer.MIN_VALUE, CityLayout.groundLevelFrom(new int[0], 6));
+	}
+
+	/** Same samples, same answer — the level is part of the deterministic city description. */
+	@Test
+	void groundLevelIsDeterministic() {
+		int[] a = {64, 70, 68, 71, 65};
+		int[] b = {71, 65, 70, 64, 68};   // same multiset, different order
+
+		assertEquals(CityLayout.groundLevelFrom(a, 6), CityLayout.groundLevelFrom(b, 6));
+	}
 }

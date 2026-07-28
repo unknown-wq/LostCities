@@ -400,4 +400,36 @@ public final class CityLayout {
 	public static double unit(long hash) {
 		return (hash >>> 11) * 0x1.0p-53;
 	}
+
+	/**
+	 * The city's shared ground level, from terrain samples taken over its built-on lots.
+	 *
+	 * <p><b>Why the median and not the minimum.</b> This used to be {@code min} over every sample,
+	 * on the reasoning that a city should cut into a slope rather than stand on stilts over it. That
+	 * held while a city was five cells across. At {@code citySize = 9} the samples span 144×144
+	 * blocks, and the minimum over that area is not "the ground" — it is the deepest thing anywhere
+	 * under the city: one ravine, pond or cliff foot drags the whole settlement down to it and the
+	 * streets, which only clear a few blocks of headroom, end up buried under the terrain that was
+	 * never dug away. A single outlier lot must not decide the level for forty others.
+	 *
+	 * <p>The median is the cheapest statistic that cannot be moved by outliers: up to half the lots
+	 * may sit in a hole or on a spire and the level still lands on the terrain the city actually
+	 * stands on. Lots that end up above it are excavated by {@code Foundation}; lots below it are
+	 * filled. Both were always part of the design — only the reference height was wrong.
+	 *
+	 * <p>Rounding is to the <em>nearest</em> storey boundary rather than always downward: flooring
+	 * added up to {@code floorHeight - 1} blocks of unnecessary burial on top of the outlier bug.
+	 *
+	 * @param samples    terrain heights over the city's built-on lots; reordered in place
+	 * @param floorHeight storey height the result is snapped to
+	 * @return the shared ground level, or {@link Integer#MIN_VALUE} when there are no samples
+	 */
+	public static int groundLevelFrom(int[] samples, int floorHeight) {
+		if (samples.length == 0) {
+			return Integer.MIN_VALUE;
+		}
+		java.util.Arrays.sort(samples);
+		int median = samples[samples.length / 2];
+		return Math.floorDiv(median + floorHeight / 2, floorHeight) * floorHeight;
+	}
 }
