@@ -1,6 +1,8 @@
 {
   "filler": "#",
   "rubble": "}",
+  "mincellars": 1,
+  "maxcellars": 1,
   "palette": {
     "palette": [
       {
@@ -12,41 +14,253 @@
         "char": "}",
         "variant": "deepslate_rubble",
         "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "0",
+        "variant": "blackstone",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "2",
+        "blocks": [
+          {
+            "random": 40,
+            "block": "minecraft:cracked_deepslate_bricks"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:deepslate_bricks"
+          }
+        ],
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "3",
+        "block": "minecraft:deepslate_brick_wall"
+      },
+      {
+        "char": "5",
+        "block": "minecraft:deepslate_tile_slab[type=bottom]"
+      },
+      {
+        "char": "6",
+        "block": "minecraft:deepslate_tile_slab[type=top]"
+      },
+      {
+        "char": "7",
+        "block": "minecraft:polished_blackstone_brick_slab[type=bottom]"
+      },
+      {
+        "char": "8",
+        "block": "minecraft:chiseled_polished_blackstone",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": ">",
+        "block": "minecraft:deepslate_tile_stairs[facing=east,half=bottom,shape=straight]"
+      },
+      {
+        "char": "<",
+        "block": "minecraft:deepslate_tile_stairs[facing=west,half=bottom,shape=straight]"
+      },
+      {
+        "char": "^",
+        "block": "minecraft:deepslate_tile_stairs[facing=north,half=bottom,shape=straight]"
+      },
+      {
+        "char": "V",
+        "block": "minecraft:deepslate_tile_stairs[facing=south,half=bottom,shape=straight]"
+      },
+      {
+        "char": "P",
+        "block": "minecraft:polished_blackstone_brick_stairs[facing=north,half=top,shape=straight]"
+      },
+      {
+        "char": "J",
+        "block": "minecraft:polished_blackstone_brick_stairs[facing=south,half=top,shape=straight]"
+      },
+      {
+        "char": "I",
+        "block": "minecraft:polished_blackstone_brick_stairs[facing=east,half=top,shape=straight]"
+      },
+      {
+        "char": "U",
+        "block": "minecraft:polished_blackstone_brick_stairs[facing=west,half=top,shape=straight]"
+      },
+      {
+        "char": "f",
+        "block": "minecraft:polished_deepslate"
+      },
+      {
+        "char": "i",
+        "block": "minecraft:smooth_basalt"
+      },
+      {
+        "char": "n",
+        "block": "minecraft:lantern[hanging=true]"
+      },
+      {
+        "char": "j",
+        "block": "minecraft:soul_lantern[hanging=true]"
+      },
+      {
+        "char": "k",
+        "block": "minecraft:gray_carpet"
+      },
+      {
+        "char": "m",
+        "block": "minecraft:light_gray_carpet"
+      },
+      {
+        "char": "q",
+        "block": "minecraft:iron_block",
+        "damaged": "minecraft:iron_bars"
+      },
+      {
+        "char": "&",
+        "block": "minecraft:barrel[facing=up]",
+        "loot": "chestloot"
+      },
+      {
+        "char": "s",
+        "blocks": [
+          {
+            "random": 30,
+            "block": "minecraft:bookshelf"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:barrel[facing=up]"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:chiseled_bookshelf"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:lectern"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:bookshelf"
+          }
+        ]
+      },
+      {
+        "char": "O",
+        "blocks": [
+          {
+            "random": 30,
+            "block": "minecraft:cartography_table"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:loom"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:smithing_table"
+          },
+          {
+            "random": 20,
+            "block": "minecraft:barrel[facing=up]"
+          },
+          {
+            "random": 15,
+            "block": "minecraft:composter"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:cobweb"
+          }
+        ]
+      },
+      {
+        "char": "r",
+        "blocks": [
+          {
+            "random": 30,
+            "block": "minecraft:cobbled_deepslate_slab[type=bottom]"
+          },
+          {
+            "random": 25,
+            "block": "minecraft:deepslate_tile_slab[type=bottom]"
+          },
+          {
+            "random": 12,
+            "block": "minecraft:cobweb"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:air"
+          }
+        ]
+      },
+      {
+        "char": "e",
+        "blocks": [
+          {
+            "random": 40,
+            "block": "minecraft:cracked_deepslate_tiles"
+          },
+          {
+            "random": 40,
+            "block": "minecraft:air"
+          },
+          {
+            "random": 1000,
+            "block": "minecraft:deepslate_tiles"
+          }
+        ]
       }
     ]
   },
   "parts": [
     {
+      "part": "building6_cellar",
+      "cellar": true
+    },
+    {
+      "part": "building6_ground",
+      "ground": true,
+      "top": false
+    },
+    {
+      "part": "building6_1",
       "top": false,
-      "part": "building5_1"
+      "ground": false,
+      "cellar": false
     },
     {
+      "part": "building6_2",
       "top": false,
-      "part": "building5_2"
+      "ground": false,
+      "cellar": false
     },
     {
+      "part": "building6_3",
       "top": false,
-      "part": "building5_3"
+      "ground": false,
+      "cellar": false,
+      "range": "2,16"
     },
     {
+      "part": "building6_4",
       "top": false,
-      "part": "building5_4"
+      "ground": false,
+      "cellar": false,
+      "range": "1,4"
     },
     {
-      "top": true,
-      "part": "top1x1_2"
+      "part": "building6_5",
+      "top": false,
+      "ground": false,
+      "cellar": false,
+      "range": "3,16"
     },
     {
-      "top": true,
-      "part": "top1x1_3"
-    },
-    {
-      "top": true,
-      "part": "top1x1_4"
-    },
-    {
-      "top": true,
-      "part": "top1x1_5"
+      "part": "building6_top",
+      "top": true
     }
   ]
 }
