@@ -349,6 +349,22 @@
         "block": "minecraft:lightning_rod[facing=up,powered=false]"
       },
       {
+        "char": "f",
+        "block": "minecraft:birch_door[facing=north,half=lower,hinge=left,open=false,powered=false]"
+      },
+      {
+        "char": "i",
+        "block": "minecraft:birch_door[facing=north,half=upper,hinge=left,open=false,powered=false]"
+      },
+      {
+        "char": "k",
+        "block": "minecraft:birch_door[facing=north,half=lower,hinge=right,open=false,powered=false]"
+      },
+      {
+        "char": "E",
+        "block": "minecraft:birch_door[facing=north,half=upper,hinge=right,open=false,powered=false]"
+      },
+      {
         "char": "n",
         "block": "minecraft:lantern[hanging=true]"
       },

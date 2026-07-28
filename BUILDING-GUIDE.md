@@ -78,6 +78,11 @@ it just makes your building silently wrong. Do not rely on a crash to tell you s
   `park_pool` and `park_trees` are 2. Repo-wide, **60 of the 194 parts have fewer than 6 slices**,
   and all of them are tops, streets, parks, fountains, bridges, rails or shop interiors. So do not
   pad a street or a roof out to 6 slices to satisfy this rule — check how the part is placed first.
+* **`parts2` overlays are the third exception.** A part referenced from a building's `parts2`
+  list is meant to be drawn *over* a storey, not stacked as one, so it is a thin furniture layer:
+  `shopping11_in_3` is 1 slice, `shopping11_in_1` and `_in_2` are 3. (In the live engine `parts2`
+  is never placed at all — see §9.) **The rule in one line: exactly the parts referenced from
+  `parts` without `"top": true` must be 6 slices.**
 
 ### Orientation — **[verified]**
 
@@ -159,7 +164,7 @@ Real file, `buildings/building6.json`, trimmed:
 | `refpalette` | name of a shared palette file to attach. Mutually exclusive with `palette`. |
 | `palette` | **inline local palette** — see §5. |
 | `parts` | list of part refs, see below. |
-| `parts2` | an optional second part drawn at the same height (overlay pass). Unused by the shipped buildings. |
+| `parts2` | a second, usually shorter part meant to be overlaid on the storey at the same height. Declared by 10 shipped buildings — the `shopping*` and `town*` quadrants only, **not** `center*` or `library*` — but **the live engine never places it** (see §9), so today it is inert data. |
 
 ### Part refs and their conditions
 
@@ -437,22 +442,27 @@ for f in files:
 print("1. JSON parse: %d/%d OK" % (len(docs), len(files)))
 bld = docs[os.path.join(BASE, "buildings", NAME + ".json")]
 
-# --- 2. geometry: xsize x zsize, identical slice counts -------------------
-counts = {}
+# --- 2. geometry: xsize x zsize, storey-stack slice counts ----------------
+# Only the storey stack must be 6 slices (see section 2): parts referenced from
+# "parts" without "top": true. Tops sit above everything and parts2 entries are
+# overlays, so both may legitimately be shorter -- reported, never failed.
+storey = {p["part"] for p in bld["parts"] if p.get("top") is not True}
+counts, other = {}, {}
 for f, d in docs.items():
     if "slices" not in d:
         continue
     base, xs, zs = os.path.basename(f), d["xsize"], d["zsize"]
-    counts[base] = len(d["slices"])
+    (counts if base[:-5] in storey else other)[base] = len(d["slices"])
     for si, s in enumerate(d["slices"]):
         if len(s) != zs:
             ok = False; print("  BAD row count", base, "slice", si, len(s))
         for zi, row in enumerate(s):
             if len(row) != xs:
                 ok = False; print("  BAD row length", base, si, zi, len(row), repr(row))
-print("2. geometry: slice counts =", sorted(set(counts.values())))
-if len(set(counts.values())) != 1:
-    ok = False; print("  SLICE COUNT MISMATCH:", counts)
+print("2. geometry: storey parts =", sorted(set(counts.values())),
+      " tops/overlays =", sorted(set(other.values())))
+if set(counts.values()) != {6}:
+    ok = False; print("  STOREY PARTS MUST ALL BE 6 SLICES:", counts)
 
 # --- 3. every char is defined --------------------------------------------
 def pal_chars(p):
@@ -526,10 +536,17 @@ Check before you design around any of these. **[verified by absence — grepped 
 * **City spheres** — `issphere` is hard-wired to false.
 * **`belowpart` and `inbiome` conditions** — accepted by the codec, ignored by the matcher.
 * **`worldstyles/`** — loaded, never consulted.
+* **`parts2` overlays.** `1.21/.../LostCityTerrainFeature` collects them into a `part2Map` and
+  draws them over each storey after the main pass. In the live engine `Building.getRandomPart2`
+  exists but **nothing calls it** — the only occurrences of `getRandomPart2` in
+  `lostbuildings/**` are its own two declarations at `engine/Building.java:153` and `:166`
+  [verified]. So the shipped overlay layers are currently never placed. That is **10 buildings
+  and 58 overlay refs** of dead data: `shopping01/10/11`, `shopping_open01/10/11` (6 each),
+  `town00` (3), `town01` (7), `town10`, `town11` (6 each). Do not put content you care about in
+  `parts2`.
 
 Present in the live engine and worth using: damage/weathering (`damaged`), rubble scatter
-(`rubble`), honest per-storey loot and mob condition resolution, `parts2` overlay,
-building `role` biasing of loot.
+(`rubble`), honest per-storey loot and mob condition resolution, building `role` biasing of loot.
 
 ---
 
