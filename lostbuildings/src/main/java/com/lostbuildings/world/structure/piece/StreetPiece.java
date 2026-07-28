@@ -12,6 +12,7 @@ import com.lostbuildings.world.feature.Streets;
 import com.lostbuildings.world.feature.StyleSelector;
 import com.lostbuildings.world.feature.WorldGenFlags;
 import com.lostbuildings.world.structure.CityLayout;
+import com.lostbuildings.world.structure.StreetCarPlacer;
 import com.lostbuildings.world.structure.StreetDecor;
 import com.lostbuildings.world.structure.StreetTiles;
 import net.minecraft.core.BlockPos;
@@ -223,6 +224,10 @@ public class StreetPiece extends CityPiece {
 				}
 			}
 		}
+
+		// Traffic goes on last: a car stands on the finished carriageway, and the kerb ring above
+		// has already been rewritten, so nothing here can be overwritten by the loop.
+		StreetCarPlacer.place(level, chunkBox, seed, cellMinX(), cellMinZ(), this.groundY, this.neighbourMask);
 	}
 
 	private void lamp(WorldGenLevel level, BoundingBox chunkBox, BlockPos.MutableBlockPos cursor,
