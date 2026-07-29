@@ -1,5 +1,6 @@
 package com.lostbuildings;
 
+import com.lostbuildings.command.LostCityCommand;
 import com.lostbuildings.engine.AssetLoader;
 import com.lostbuildings.engine.Assets;
 import com.lostbuildings.engine.BuildingEngine;
@@ -40,6 +41,7 @@ public class LostBuildings implements ModInitializer {
 		ModStructureTypes.init();
 		ModStructurePieceTypes.init();
 		BiolithGeneration.init();
+		LostCityCommand.init();
 
 		// Reload assets on every datapack (re)load, i.e. also on /reload — not just once at startup.
 		// Parsing happens in prepare() (worker thread), publishing in apply() (server thread).
