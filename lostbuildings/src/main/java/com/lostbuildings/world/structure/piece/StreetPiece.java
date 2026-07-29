@@ -199,10 +199,12 @@ public class StreetPiece extends CityPiece {
 	 */
 	private void decorate(WorldGenLevel level, BoundingBox chunkBox, long seed, int surfaceY) {
 		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+		int minX = cellMinX();
+		int minZ = cellMinZ();
 		for (int dx = 0; dx < 16; dx++) {
 			for (int dz = 0; dz < 16; dz++) {
-				int wx = cellMinX() + dx;
-				int wz = cellMinZ() + dz;
+				int wx = minX + dx;
+				int wz = minZ + dz;
 				if (StreetDecor.isRoad(dx, dz, this.neighbourMask)) {
 					if (StreetDecor.isPothole(seed, wx, wz, this.potholeChance)) {
 						set(level, chunkBox, cursor.set(wx, surfaceY, wz), POTHOLE_RIM);

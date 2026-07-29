@@ -83,7 +83,8 @@ public final class BlockStates {
                     .setValue(WallBlock.SOUTH, canAttachWall(neighbour(level, m, pos, Direction.SOUTH)));
         }
         if (block instanceof StairBlock) {
-            return state.setValue(StairBlock.SHAPE, getShapeProperty(level, state, pos));
+            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            return state.setValue(StairBlock.SHAPE, getShapeProperty(level, m, state, pos));
         }
         return state;
     }
@@ -100,29 +101,26 @@ public final class BlockStates {
         return level.getBlockState(m);
     }
 
-    /** {@link #neighbour(WorldGenLevel, BlockPos.MutableBlockPos, BlockPos, Direction)} without a reusable cursor. */
-    private static BlockState neighbour(WorldGenLevel level, BlockPos pos, Direction dir) {
-        return neighbour(level, new BlockPos.MutableBlockPos(), pos, dir);
-    }
-
     private static boolean isBlockStairs(BlockState state) {
         return state.getBlock() instanceof StairBlock;
     }
 
-    private static boolean isDifferentStairs(WorldGenLevel level, BlockState state, BlockPos pos, Direction face) {
-        BlockState blockstate = neighbour(level, pos, face);
+    private static boolean isDifferentStairs(WorldGenLevel level, BlockPos.MutableBlockPos m, BlockState state,
+                                             BlockPos pos, Direction face) {
+        BlockState blockstate = neighbour(level, m, pos, face);
         return !isBlockStairs(blockstate)
                 || blockstate.getValue(StairBlock.FACING) != state.getValue(StairBlock.FACING)
                 || blockstate.getValue(StairBlock.HALF) != state.getValue(StairBlock.HALF);
     }
 
-    private static StairsShape getShapeProperty(WorldGenLevel level, BlockState state, BlockPos pos) {
+    private static StairsShape getShapeProperty(WorldGenLevel level, BlockPos.MutableBlockPos m,
+                                                BlockState state, BlockPos pos) {
         Direction direction = state.getValue(StairBlock.FACING);
-        BlockState blockstate = neighbour(level, pos, direction);
+        BlockState blockstate = neighbour(level, m, pos, direction);
         if (isBlockStairs(blockstate) && state.getValue(StairBlock.HALF) == blockstate.getValue(StairBlock.HALF)) {
             Direction direction1 = blockstate.getValue(StairBlock.FACING);
             if (direction1.getAxis() != state.getValue(StairBlock.FACING).getAxis()
-                    && isDifferentStairs(level, state, pos, direction1.getOpposite())) {
+                    && isDifferentStairs(level, m, state, pos, direction1.getOpposite())) {
                 if (direction1 == direction.getCounterClockWise()) {
                     return StairsShape.OUTER_LEFT;
                 }
@@ -130,11 +128,11 @@ public final class BlockStates {
             }
         }
 
-        BlockState blockstate1 = neighbour(level, pos, direction.getOpposite());
+        BlockState blockstate1 = neighbour(level, m, pos, direction.getOpposite());
         if (isBlockStairs(blockstate1) && state.getValue(StairBlock.HALF) == blockstate1.getValue(StairBlock.HALF)) {
             Direction direction2 = blockstate1.getValue(StairBlock.FACING);
             if (direction2.getAxis() != state.getValue(StairBlock.FACING).getAxis()
-                    && isDifferentStairs(level, state, pos, direction2)) {
+                    && isDifferentStairs(level, m, state, pos, direction2)) {
                 if (direction2 == direction.getCounterClockWise()) {
                     return StairsShape.INNER_LEFT;
                 }

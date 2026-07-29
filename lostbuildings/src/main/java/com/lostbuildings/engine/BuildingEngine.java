@@ -26,6 +26,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
@@ -70,7 +71,7 @@ public class BuildingEngine {
 
     private final Assets assets;
     // Worldgen runs on many threads: every cache below has to be concurrent.
-    private final Map<Block, BlockEntityType<?>> typeCache = new ConcurrentHashMap<>();
+    private final Map<Block, Optional<BlockEntityType<?>>> typeCache = new ConcurrentHashMap<>();
 
     /**
      * Compiled palettes keyed by the exact set of source palettes they were merged from. Compiling
@@ -368,6 +369,16 @@ public class BuildingEngine {
 
         int xSize = part.getXSize();
         int zSize = part.getZSize();
+        // One cursor for the whole part rather than a fresh BlockPos per placed block: a shipped
+        // building places on the order of 8000 blocks, a city on the order of 300k, and every one of
+        // them allocated an immutable BlockPos that died immediately. Everything downstream either
+        // reads the coordinates out of it (setBlock, getChunk, BlockStates.correct, which carries its
+        // own cursor) or takes an explicit immutable copy (the connectables list below) — the same
+        // contract Foundation, Streets and PartPlacer already rely on.
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        int originX = origin.getX();
+        int originY = origin.getY();
+        int originZ = origin.getZ();
         for (int x = 0; x < xSize; x++) {
             for (int z = 0; z < zSize; z++) {
                 char[] vs = part.getVSlice(x, z);
@@ -394,7 +405,7 @@ public class BuildingEngine {
                         continue;
                     }
 
-                    BlockPos pos = origin.offset(rx, oy + y, rz);
+                    pos.set(originX + rx, originY + oy + y, originZ + rz);
                     // Shipped parts are 16x16 and sites are chunk-aligned inside the write window,
                     // so this never fires — but a datapack part wider than a chunk would otherwise
                     // read and write outside the window, and the region logs both.
@@ -607,15 +618,24 @@ public class BuildingEngine {
         return roll < ctx.role().signatureChance(ctx.floor()) ? signature : null;
     }
 
+    /**
+     * The block-entity type a state carries, or {@code null}.
+     *
+     * <p>The negative answer is cached too. {@code ConcurrentHashMap.computeIfAbsent} stores nothing
+     * when the mapping function returns {@code null}, so a palette entry that hangs loot or NBT on a
+     * block with no block entity used to re-scan the whole {@code BLOCK_ENTITY_TYPE} registry for
+     * every one of its blocks, forever. Wrapping the answer in an {@link Optional} makes "no"
+     * cacheable.
+     */
     private BlockEntityType<?> getTypeForBlock(BlockState state) {
         return typeCache.computeIfAbsent(state.getBlock(), block -> {
             for (BlockEntityType<?> type : BuiltInRegistries.BLOCK_ENTITY_TYPE) {
                 if (type.isValid(state)) {
-                    return type;
+                    return Optional.of(type);
                 }
             }
-            return null;
-        });
+            return Optional.empty();
+        }).orElse(null);
     }
 
     /**

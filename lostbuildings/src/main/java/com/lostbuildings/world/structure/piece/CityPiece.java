@@ -153,10 +153,12 @@ public abstract class CityPiece extends StructurePiece {
 		}
 		boolean everywhere = this.climate == StyleSelector.Climate.SNOWY;
 		BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
+		int minX = cellMinX();
+		int minZ = cellMinZ();
 		for (int dx = 0; dx < FOOTPRINT; dx++) {
 			for (int dz = 0; dz < FOOTPRINT; dz++) {
-				int x = cellMinX() + dx;
-				int z = cellMinZ() + dz;
+				int x = minX + dx;
+				int z = minZ + dz;
 				if (!everywhere
 						&& CityLayout.unit(CityLayout.hash(worldSeed, x, z, WEATHER_SALT)) >= MOSS_CHANCE) {
 					continue;
