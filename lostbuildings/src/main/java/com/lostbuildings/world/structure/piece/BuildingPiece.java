@@ -96,6 +96,18 @@ public class BuildingPiece extends CityPiece {
 		this.kind = readKind(tag.getStringOr("Kind", CityLayout.BuildingKind.RESIDENTIAL.name()));
 	}
 
+	/**
+	 * The palette style this building was assigned when the city was laid out.
+	 *
+	 * <p>Read-only, and the same shape as {@link CityPiece#cellChunkX()}: a piece decides nothing at
+	 * placement time, so everything a caller or a test can ask it is a decision the structure already
+	 * made. This is what lets a test see that {@code /lostcity here <cells> <style>} reached the
+	 * pieces rather than merely being parsed.
+	 */
+	public String styleName() {
+		return this.styleName;
+	}
+
 	private static CityLayout.BuildingKind readKind(String name) {
 		for (CityLayout.BuildingKind candidate : CityLayout.BuildingKind.values()) {
 			if (candidate.name().equals(name)) {

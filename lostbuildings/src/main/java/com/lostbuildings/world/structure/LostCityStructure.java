@@ -78,13 +78,46 @@ public class LostCityStructure extends Structure {
 
 	private final LostCityConfig config;
 
+	/**
+	 * A style name forced on every building of this city, or {@code null} to read it off the biome.
+	 *
+	 * <p>Deliberately <b>not</b> a codec field: a registered structure always resolves its style from
+	 * the biome at its centre, which is what keeps a desert city sandstone and a taiga city pale. The
+	 * override exists for the one caller that has an operator standing in front of it and asking for a
+	 * specific look — {@code /lostcity here <cells> <style>} — and it reaches this class only through
+	 * {@link #derive}, on a throwaway instance that is never in a registry.
+	 */
+	private final String styleOverride;
+
 	public LostCityStructure(Structure.StructureSettings settings, LostCityConfig config) {
+		this(settings, config, null);
+	}
+
+	private LostCityStructure(Structure.StructureSettings settings, LostCityConfig config, String styleOverride) {
 		super(settings);
 		this.config = config;
+		this.styleOverride = styleOverride;
 	}
 
 	public LostCityConfig config() {
 		return this.config;
+	}
+
+	/**
+	 * A copy of this structure with a different config and (optionally) a forced style.
+	 *
+	 * <p><b>Why a copy.</b> The instance in {@code Registries.STRUCTURE} is shared by every chunk the
+	 * server will ever generate and by every player on it; mutating it to honour one command would
+	 * change what worldgen builds for the rest of the session. Everything the generation path reads
+	 * off a structure is final, so a second instance carrying the same {@link StructureSettings} —
+	 * the same biome set, generation step and terrain adaptation — walks exactly the same code with
+	 * exactly the same seeded draw order.
+	 *
+	 * @param newConfig     the config the copy assembles its city from
+	 * @param newStyle      style name to force on every building, or {@code null} to resolve from the biome
+	 */
+	public LostCityStructure derive(LostCityConfig newConfig, String newStyle) {
+		return new LostCityStructure(this.settings, newConfig, newStyle);
 	}
 
 	@Override
@@ -113,7 +146,7 @@ public class LostCityStructure extends Structure {
 
 		BlockPos centre = new BlockPos(origin.getMiddleBlockX(), groundY, origin.getMiddleBlockZ());
 		Holder<Biome> biome = biomeAt(context, centre);
-		String style = resolveStyle(biome);
+		String style = this.styleOverride != null ? this.styleOverride : resolveStyle(biome);
 		StyleSelector.Climate climate = StyleSelector.climateFor(biome);
 
 		return Optional.of(new Structure.GenerationStub(centre,

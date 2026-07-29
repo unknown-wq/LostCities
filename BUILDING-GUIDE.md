@@ -685,7 +685,68 @@ Verified working (exit 0) as of this writing. Notes:
 
 ---
 
-## 11. Suggested workflow for "upgrade building N"
+## 11. Seeing it in game — the `/lostcity` command
+
+A green build tells you the JSON parses. It does not tell you the building looks right, and until
+this command the only way to find out was to fly around until worldgen happened to roll a city.
+`/lostcity` builds one where you are standing, at whatever size you ask for.
+
+```
+/lostcity here [<cells> [<style>]]
+/lostcity build <structure> [<cells> [<style>]]
+```
+
+| argument | meaning |
+|---|---|
+| `<cells>` | city size in **cells**, the same unit as `city_size` in the structure JSON. One cell = one chunk = 16×16. Omit it and you get the size the structure ships with (`9` for `lost_city`, `5` for `charred_city`). |
+| `<style>` | force a palette style — `standard`, `desert`, `snowy`, `swamp`, `standard_border`, … — instead of resolving one from the biome. Tab-completes from the styles the loaded datapack actually has, and an unknown name is an error rather than a silent fallback. |
+| `<structure>` | any `Registries.STRUCTURE` entry whose type is `lostbuildings:lost_city` — so `lostbuildings:lost_city` or `lostbuildings:charred_city`. Anything else (a vanilla village, `lostbuildings:oil_rig`) is refused with a message. |
+
+Permission level 2 — op / cheats, the same bar `/place` sits behind. The city is centred on the
+**chunk the caller is standing in**, and the reply names that chunk, the block extent, and what came
+out (`… 9x9 cells requested, 65 emitted (22 lots) - 18 buildings, 40 streets, 3 parks, 3 airfield
+cells`). Every chunk the city spans is generated before anything is written, so you do not have to
+fly the area in first.
+
+**Size cap: 25 cells.** Past that the command refuses rather than clamping. 25×25 is 625 chunks, all
+of which have to reach `FULL` synchronously on the server thread before a block may be placed — about
+what one player at render distance 12 already holds. Expect the server to visibly hang for as long
+as those chunks take; a 9-cell city on already-explored ground is instant.
+
+### What it is, and the three ways it is not worldgen
+
+It is not a re-implementation. It calls `Structure.generate` and `StructureStart.placeInChunk`
+exactly as vanilla's `/place structure` does, so the pieces are assembled by `LostCityStructure`
+itself — same layout, same seeded ground level, same style and bridge decisions. If the command and
+worldgen ever disagree, the bug is in the shared path.
+
+Three differences are unavoidable and worth knowing before you file a bug against what you see:
+
+1. **The terrain-relief veto is off.** `max_height_diff` decides whether a site is *offered* a city;
+   it changes nothing about the city that is then built. A command meaning "here" cannot honour a
+   rule whose answer is "not here", so it is forced to `0` and a hillside gets a city.
+2. **The chunks are already finished.** During worldgen a city is written into chunks whose feature
+   step has not run; here it has. Every piece reads `Heightmap.Types.WORLD_SURFACE_WG`, and on a
+   finished chunk that includes the trees — so foundations excavate a little more and snow can settle
+   on a canopy. Vanilla's `/place` has the same discrepancy.
+3. **No structure reference is recorded.** The result is blocks, not a start in the chunk's structure
+   list, so `/locate structure lostbuildings:lost_city` will not find what you just built and the
+   structure's mob-spawn overrides do not apply. Use `/locate` for real worldgen cities; that is what
+   it is for, and it is why the command deliberately has no `locate` subcommand of its own.
+
+Also note: **even `<cells>` values put the airfield one cell outside the square.** `Airport.forPlan`
+places the runway at `origin ± outerRing`, and an even-sized grid is not symmetric about its origin
+(`cells = 16` runs `-7..8`). Every shipped size is odd, so this only bites when you type an even
+number by hand. Harmless — the airfield is still built — but it is why
+`LostCityCommandTest.theCityIsTheSizeItWasAskedFor` measures the span with airfield cells excluded.
+
+Source: `world/structure/LostCityStructure.derive(...)` builds a throwaway copy of the registered
+structure carrying the derived `LostCityConfig` — a registry entry is shared by every chunk the
+server will ever generate and is never mutated.
+
+---
+
+## 12. Suggested workflow for "upgrade building N"
 
 1. Read `buildings/buildingN.json` and every `parts/buildingN_*.json`. Note the **slice count** and
    the existing shell geometry (wall/glass/recess pattern) — reuse it so the building keeps its

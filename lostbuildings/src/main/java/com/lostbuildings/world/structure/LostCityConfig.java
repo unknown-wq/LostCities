@@ -182,6 +182,43 @@ public record LostCityConfig(
 				ContentSettings.defaults());
 	}
 
+	// --- derived copies, for callers that need one knob changed without touching a registry entry ---
+
+	/**
+	 * This config with a different {@code city_size}, for {@code /lostcity here &lt;cells&gt;}.
+	 *
+	 * <p>A structure in {@code Registries.STRUCTURE} is shared by every chunk the server will ever
+	 * generate, so the command may not edit the one it was handed. It derives a config instead and
+	 * hands it to a throwaway {@link LostCityStructure} — see
+	 * {@link LostCityStructure#derive(LostCityConfig, String)}. Returns {@code this} when nothing
+	 * would change, so the common "no override" path allocates nothing.
+	 *
+	 * <p>Deliberately <em>not</em> clamped to the codec's {@code 1..16}: that bound exists so a
+	 * datapack cannot ask for a city wider than {@code ModStructureSets.CITY_SEPARATION} and have two
+	 * cities overlap during worldgen. A one-shot command places no structure reference and competes
+	 * with nothing, so its only real limit is how many chunks it is willing to generate in one tick —
+	 * which is the command's own cap, not this one.
+	 */
+	public LostCityConfig withCitySize(int newCitySize) {
+		int size = Math.max(1, newCitySize);
+		return size == this.citySize ? this : new LostCityConfig(buildings, minFloors, maxFloors, foundation,
+				size, density, cellars, damageChance, maxHeightDiff, streets, content);
+	}
+
+	/**
+	 * This config with a different terrain-relief veto — {@code 0} disables it entirely.
+	 *
+	 * <p>{@link #maxHeightDiff} decides <em>whether a site is offered a city at all</em>; it changes
+	 * nothing about the city that is then built. A command whose whole contract is "build one here"
+	 * therefore turns it off rather than refusing on a hillside, and the pieces it emits are the same
+	 * pieces worldgen would have emitted on that spot.
+	 */
+	public LostCityConfig withMaxHeightDiff(int newMaxHeightDiff) {
+		int diff = Math.max(0, newMaxHeightDiff);
+		return diff == this.maxHeightDiff ? this : new LostCityConfig(buildings, minFloors, maxFloors, foundation,
+				citySize, density, cellars, damageChance, diff, streets, content);
+	}
+
 	// --- convenience accessors, so call sites read the same as they did in wave 1 ---
 
 	public BlockState streetBlock() {
