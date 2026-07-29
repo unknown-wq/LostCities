@@ -115,6 +115,18 @@ public final class Airport {
 	/** An empty airfield — a city too small to hold one. */
 	private static final Airport NONE = new Airport(null, List.of());
 
+	/**
+	 * How many building lots a city needs before it gets an airfield. Strictly more than this, so
+	 * 15 lots is a town and 16 is a city.
+	 *
+	 * <p>A runway takes three of the outer ring's cells, which on a small settlement is most of one
+	 * side of it — an airfield bigger than the place it serves. At the shipped {@code city_size: 9}
+	 * a full city has 25 lots before density thins them, so this passes the standard city and turns
+	 * away the smaller ones: the {@code city_size: 5} charred towns top out at 9 lots and get
+	 * nothing, which is what they should get.
+	 */
+	private static final int MIN_BUILDINGS = 15;
+
 	private final Side side;
 	private final List<Segment> segments;
 
@@ -131,6 +143,9 @@ public final class Airport {
 	public static Airport forPlan(CityLayout.Plan plan, long seed) {
 		if (plan == null || plan.isEmpty()) {
 			return NONE;
+		}
+		if (buildingLots(plan) <= MIN_BUILDINGS) {
+			return NONE;    // a village does not have an airport
 		}
 		int ring = outerRing(plan);
 		if (ring < 1) {
@@ -163,6 +178,24 @@ public final class Airport {
 			segments.add(new Segment(chunkX, chunkZ, PARTS[i], side.quarterTurns()));
 		}
 		return new Airport(side, List.copyOf(segments));
+	}
+
+	/**
+	 * How many lots of this city are built on — the size measure the airfield threshold uses.
+	 *
+	 * <p>Counts {@link CityLayout.Role#BUILDING} and {@link CityLayout.Role#MULTI_BUILDING} cells and
+	 * nothing else. Landmark quadrants count as the four lots they occupy rather than as the one
+	 * building they form, because the question here is how much of the map the settlement covers,
+	 * not how many front doors it has.
+	 */
+	public static int buildingLots(CityLayout.Plan plan) {
+		int lots = 0;
+		for (CityLayout.Cell cell : plan.cells()) {
+			if (cell.role() == CityLayout.Role.BUILDING || cell.role() == CityLayout.Role.MULTI_BUILDING) {
+				lots++;
+			}
+		}
+		return lots;
 	}
 
 	/**

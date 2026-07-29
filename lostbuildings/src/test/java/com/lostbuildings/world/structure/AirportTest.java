@@ -81,12 +81,24 @@ class AirportTest {
 
 	// ------------------------------------------------------------------ where it goes
 
-	/** One airfield per city, and it is exactly {@link Airport#LENGTH} distinct cells. */
+	/**
+	 * One airfield per city big enough to warrant one, and it is exactly {@link Airport#LENGTH}
+	 * distinct cells.
+	 *
+	 * <p>Small settlements are skipped rather than asserted over — see
+	 * {@link #onlyCitiesWithMoreThanFifteenLotsGetAnAirfield}. The count is asserted at the end so
+	 * that a threshold which accidentally rejected everything would fail here rather than pass
+	 * vacuously.
+	 */
 	@Test
 	void everyCityGetsExactlyOneAirfieldOfThreeCells() {
+		int withAirfield = 0;
 		for (int city = 0; city < 200; city++) {
 			Airport airport = airportOf(city);
-			assertTrue(airport.exists(), "city " + city + " got no airfield at all");
+			if (!airport.exists()) {
+				continue;
+			}
+			withAirfield++;
 			assertEquals(Airport.LENGTH, airport.segments().size(),
 					"city " + city + ": an airfield is " + Airport.LENGTH + " cells");
 			Set<String> cells = new HashSet<>();
@@ -95,6 +107,9 @@ class AirportTest {
 						"city " + city + ": two segments landed on the same cell");
 			}
 		}
+		assertTrue(withAirfield > 150,
+				"only " + withAirfield + " of 200 cities got an airfield; the size threshold is "
+						+ "rejecting ordinary cities, not just small towns");
 	}
 
 	/**
@@ -123,6 +138,9 @@ class AirportTest {
 	void theSegmentsAreThreeAdjacentCellsInAStraightLine() {
 		for (int city = 0; city < 200; city++) {
 			Airport airport = airportOf(city);
+			if (!airport.exists()) {
+				continue;   // too small for an airfield
+			}
 			List<Airport.Segment> segments = airport.segments();
 			boolean alongX = airport.side().runwayAlongX();
 			for (int i = 1; i < segments.size(); i++) {
@@ -153,6 +171,9 @@ class AirportTest {
 		for (int city = 0; city < 200; city++) {
 			CityLayout.Plan plan = planOf(city);
 			Airport airport = Airport.forPlan(plan, SEED);
+			if (!airport.exists()) {
+				continue;   // too small for an airfield
+			}
 			int edge = Airport.outerRing(plan);
 			int expected = switch (airport.side()) {
 				case NORTH -> plan.originChunkZ() - edge;
@@ -173,6 +194,9 @@ class AirportTest {
 	void theTerminalIsTheMiddleSegmentAndTheEndsAreThresholds() {
 		for (int city = 0; city < 50; city++) {
 			List<Airport.Segment> segments = airportOf(city).segments();
+			if (segments.isEmpty()) {
+				continue;   // too small for an airfield
+			}
 			assertEquals(Airport.PART_THRESHOLD_START, segments.get(0).partName());
 			assertEquals(Airport.PART_TERMINAL, segments.get(1).partName());
 			assertEquals(Airport.PART_THRESHOLD_END, segments.get(2).partName());
@@ -193,6 +217,9 @@ class AirportTest {
 		Set<Airport.Side> seen = new HashSet<>();
 		for (int city = 0; city < 200; city++) {
 			Airport airport = airportOf(city);
+			if (!airport.exists()) {
+				continue;   // too small for an airfield
+			}
 			Airport.Side side = airport.side();
 			seen.add(side);
 			Transform transform = Transform.values()[side.quarterTurns()];
@@ -245,6 +272,9 @@ class AirportTest {
 		Set<Integer> offsets = new HashSet<>();
 		for (int city = 0; city < 200; city++) {
 			Airport airport = airportOf(city);
+			if (!airport.exists()) {
+				continue;   // too small for an airfield
+			}
 			sides.add(airport.side());
 			CityLayout.Plan plan = planOf(city);
 			Airport.Segment middle = airport.segments().get(1);
@@ -286,6 +316,42 @@ class AirportTest {
 				"claims() matched " + claimed + " city cells, more than the airfield has");
 		// A cell far outside the city must never be claimed, or claims() is answering true blindly.
 		assertFalse(airport.claims(plan.originChunkX() + 1000, plan.originChunkZ() + 1000));
+	}
+
+	/**
+	 * Only a city big enough to warrant one gets an airfield. A runway takes three cells of the
+	 * outer ring, which on a small town is most of one side of it.
+	 */
+	@Test
+	void onlyCitiesWithMoreThanFifteenLotsGetAnAirfield() {
+		// city_size 5 — the size the charred towns ship at. Too small.
+		CityLayout.Plan town = CityLayout.plan(SEED, 0, 0,
+				new CityLayout.Settings(5, 0.9D, 1, 6, 4, 16, 0.15D, 2, 0.2D, 1));
+		int townLots = Airport.buildingLots(town);
+		assertTrue(townLots <= 15, "expected a small town, got " + townLots + " lots");
+		assertTrue(Airport.outerRing(town) >= 1, "the town does have an edge; size is the only reason to refuse");
+		assertFalse(Airport.forPlan(town, SEED).exists(),
+				"a " + townLots + "-lot town should not get an airfield");
+
+		// city_size 9 — the shipped default. Big enough.
+		CityLayout.Plan city = CityLayout.plan(SEED, 0, 0, CITY);
+		int cityLots = Airport.buildingLots(city);
+		assertTrue(cityLots > 15, "expected a full city, got only " + cityLots + " lots");
+		assertTrue(Airport.forPlan(city, SEED).exists(),
+				"a " + cityLots + "-lot city should get an airfield");
+	}
+
+	/** The count is of built-on lots, not of every cell — streets and parks are not the settlement. */
+	@Test
+	void onlyBuiltOnLotsCountTowardsTheThreshold() {
+		CityLayout.Plan city = CityLayout.plan(SEED, 0, 0, CITY);
+		long built = city.cells().stream()
+				.filter(c -> c.role() == CityLayout.Role.BUILDING || c.role() == CityLayout.Role.MULTI_BUILDING)
+				.count();
+
+		assertEquals(built, Airport.buildingLots(city));
+		assertTrue(Airport.buildingLots(city) < city.cells().size(),
+				"every cell counted, so streets and parks are being mistaken for buildings");
 	}
 
 	/** A city with no edge to build on gets no airfield instead of one hanging off its only cell. */
