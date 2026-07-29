@@ -66,6 +66,16 @@ public class LostCityStructure extends Structure {
 	 */
 	private static final int BRIDGE_DROP = 6;
 
+	/**
+	 * How many <em>consecutive</em> blocks of a carriageway centreline have to be over
+	 * {@link #BRIDGE_DROP} before the cell is bridged. Four is "wider than a road can step over" — a
+	 * river, a ravine, a lake edge — and not the lip of a hollow.
+	 */
+	private static final int BRIDGE_MIN_RUN = 4;
+
+	/** The carriageway is the middle eight columns of a cell; its centreline is column 8. */
+	private static final int ROAD_MID = 8;
+
 	private final LostCityConfig config;
 
 	public LostCityStructure(Structure.StructureSettings settings, LostCityConfig config) {
@@ -162,20 +172,42 @@ public class LostCityStructure extends Structure {
 	/**
 	 * Whether this street cell has to be bridged rather than paved.
 	 *
-	 * <p>True when the ground under the cell falls more than {@link #BRIDGE_DROP} blocks below the
-	 * road surface anywhere across it — which covers both cases the port cared about: a river or lake
-	 * (the sampled floor is well under the surface) and a ravine or cliff edge (same, without the
-	 * water). Sampling uses the same {@code getFirstOccupiedHeight} call as the city's ground level,
-	 * so the two decisions are made on identical numbers.
+	 * <p><b>What this asks.</b> Not "is any corner of the cell low". That was the old rule, and the
+	 * four corners are the columns <em>furthest</em> from the carriageway, so a pavement corner
+	 * clipping the lip of a shallow grassy hollow bridged the whole 16×16 cell — and at a crossroads,
+	 * every arm of it. That is what put a cross of decks over a meadow with no water in sight. The
+	 * amplifier is that {@code groundY} is a median snapped <em>up</em> to a multiple of the storey
+	 * height, so ground that dips only a little locally can still read as 7–10 below the road.
+	 *
+	 * <p>A road's question is whether the ground under its own centreline falls away over a stretch
+	 * long enough that {@link com.lostbuildings.world.feature.Streets} cannot embank it. So this walks
+	 * the centreline of each axis the cell actually carries road on, and bridges only on a contiguous
+	 * run.
+	 *
+	 * <p>{@code OCEAN_FLOOR_WG} is kept: it ignores water, which is what makes a river read as a gap
+	 * at all, and it is the same sampler and accessor {@link #groundLevel} uses.
 	 */
 	private static boolean needsBridge(Structure.GenerationContext context, CityLayout.Cell cell, int groundY) {
+		int mask = cell.neighbourMask();
+		boolean westEast = (mask & (CityLayout.WEST | CityLayout.EAST)) != 0;
+		boolean northSouth = (mask & (CityLayout.NORTH | CityLayout.SOUTH)) != 0;
+		return (westEast && spansAGap(context, cell, groundY, true))
+				|| (northSouth && spansAGap(context, cell, groundY, false));
+	}
+
+	/** Whether one axis of the cell's carriageway centreline crosses an unbridgeable run. */
+	private static boolean spansAGap(Structure.GenerationContext context, CityLayout.Cell cell,
+	                                 int groundY, boolean alongX) {
 		ChunkGenerator generator = context.chunkGenerator();
 		int x0 = cell.chunkX() << 4;
 		int z0 = cell.chunkZ() << 4;
-		for (int[] corner : CELL_CORNERS) {
-			int height = generator.getFirstOccupiedHeight(x0 + corner[0], z0 + corner[1],
+		int run = 0;
+		for (int i = 0; i < 16; i++) {
+			int height = generator.getFirstOccupiedHeight(
+					x0 + (alongX ? i : ROAD_MID), z0 + (alongX ? ROAD_MID : i),
 					Heightmap.Types.OCEAN_FLOOR_WG, context.heightAccessor(), context.randomState());
-			if (groundY - 1 - height > BRIDGE_DROP) {
+			run = groundY - 1 - height > BRIDGE_DROP ? run + 1 : 0;
+			if (run >= BRIDGE_MIN_RUN) {
 				return true;
 			}
 		}
