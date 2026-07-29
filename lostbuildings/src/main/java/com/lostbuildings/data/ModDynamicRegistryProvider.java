@@ -2,8 +2,8 @@ package com.lostbuildings.data;
 
 import com.lostbuildings.LostBuildings;
 import com.lostbuildings.world.biome.ModBiomes;
-import com.lostbuildings.world.feature.ModConfiguredFeatures;
-import com.lostbuildings.world.feature.ModPlacedFeatures;
+import com.lostbuildings.world.structure.ModStructureSets;
+import com.lostbuildings.world.structure.ModStructures;
 import net.fabricmc.fabric.api.datagen.v1.FabricPackOutput;
 import net.fabricmc.fabric.api.datagen.v1.provider.FabricDynamicRegistryProvider;
 import net.minecraft.core.Holder;
@@ -20,16 +20,18 @@ public class ModDynamicRegistryProvider extends FabricDynamicRegistryProvider {
 	}
 
 	public static void buildRegistry(RegistrySetBuilder registryBuilder) {
-		registryBuilder.add(Registries.CONFIGURED_FEATURE, ModConfiguredFeatures::bootstrap);
-		registryBuilder.add(Registries.PLACED_FEATURE, ModPlacedFeatures::bootstrap);
 		registryBuilder.add(Registries.BIOME, ModBiomes::bootstrap);
+		registryBuilder.add(Registries.STRUCTURE, ModStructures::bootstrap);
+		// Order matters only in that the set looks the structure up; RegistrySetBuilder resolves
+		// the dependency itself, so this is just the reading order.
+		registryBuilder.add(Registries.STRUCTURE_SET, ModStructureSets::bootstrap);
 	}
 
 	@Override
 	public void configure(HolderLookup.Provider registries, Entries entries) {
-		addAll(entries, registries.lookupOrThrow(Registries.CONFIGURED_FEATURE), LostBuildings.MOD_ID);
-		addAll(entries, registries.lookupOrThrow(Registries.PLACED_FEATURE), LostBuildings.MOD_ID);
 		addAll(entries, registries.lookupOrThrow(Registries.BIOME), LostBuildings.MOD_ID);
+		addAll(entries, registries.lookupOrThrow(Registries.STRUCTURE), LostBuildings.MOD_ID);
+		addAll(entries, registries.lookupOrThrow(Registries.STRUCTURE_SET), LostBuildings.MOD_ID);
 	}
 
 	@Override

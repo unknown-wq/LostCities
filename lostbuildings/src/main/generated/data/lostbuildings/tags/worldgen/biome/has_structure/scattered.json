@@ -1,0 +1,52 @@
+{
+  "values": [
+    {
+      "id": "#minecraft:is_forest",
+      "required": false
+    },
+    {
+      "id": "#minecraft:is_taiga",
+      "required": false
+    },
+    {
+      "id": "#minecraft:is_jungle",
+      "required": false
+    },
+    {
+      "id": "#minecraft:is_savanna",
+      "required": false
+    },
+    {
+      "id": "#minecraft:is_badlands",
+      "required": false
+    },
+    {
+      "id": "#minecraft:is_hill",
+      "required": false
+    },
+    {
+      "id": "#minecraft:is_mountain",
+      "required": false
+    },
+    {
+      "id": "#minecraft:has_structure/village_plains",
+      "required": false
+    },
+    {
+      "id": "#minecraft:has_structure/village_desert",
+      "required": false
+    },
+    {
+      "id": "#minecraft:has_structure/village_savanna",
+      "required": false
+    },
+    {
+      "id": "#minecraft:has_structure/village_snowy",
+      "required": false
+    },
+    {
+      "id": "#minecraft:has_structure/village_taiga",
+      "required": false
+    }
+  ]
+}

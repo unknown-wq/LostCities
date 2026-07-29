@@ -3,7 +3,8 @@ package com.lostbuildings;
 import com.lostbuildings.engine.AssetLoader;
 import com.lostbuildings.engine.Assets;
 import com.lostbuildings.engine.BuildingEngine;
-import com.lostbuildings.registry.ModFeatures;
+import com.lostbuildings.registry.ModStructurePieceTypes;
+import com.lostbuildings.registry.ModStructureTypes;
 import com.lostbuildings.world.gen.BiolithGeneration;
 import net.fabricmc.api.ModInitializer;
 import net.fabricmc.fabric.api.event.lifecycle.v1.ServerLifecycleEvents;
@@ -36,7 +37,8 @@ public class LostBuildings implements ModInitializer {
 
 	@Override
 	public void onInitialize() {
-		ModFeatures.init();
+		ModStructureTypes.init();
+		ModStructurePieceTypes.init();
 		BiolithGeneration.init();
 
 		// Reload assets on every datapack (re)load, i.e. also on /reload — not just once at startup.

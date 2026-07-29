@@ -1,0 +1,51 @@
+{
+  "palette": [
+    {
+      "char": "#",
+      "blocks": [
+        { "random": 28, "block": "minecraft:blackstone" },
+        { "random": 24, "block": "desolation:activated_charcoal_block" },
+        { "random": 18, "block": "minecraft:polished_blackstone" },
+        { "random": 12, "block": "desolation:cooled_ember_block" },
+        { "random": 8, "block": "minecraft:deepslate_tiles" },
+        { "random": 1000, "block": "minecraft:polished_deepslate" }
+      ]
+    },
+    {
+      "char": "}",
+      "blocks": [
+        { "random": 30, "block": "desolation:ash_block" },
+        { "random": 24, "block": "desolation:charred_slab[type=bottom]" },
+        { "random": 18, "block": "minecraft:blackstone_slab[type=bottom]" },
+        { "random": 12, "block": "desolation:activated_charcoal_block" },
+        { "random": 1000, "block": "minecraft:blackstone" }
+      ]
+    },
+    {
+      "char": "a",
+      "blocks": [
+        { "random": 44, "block": "minecraft:air" },
+        { "random": 34, "block": "minecraft:gray_stained_glass_pane" },
+        { "random": 20, "block": "minecraft:black_stained_glass" },
+        { "random": 1000, "block": "minecraft:tinted_glass" }
+      ]
+    },
+    { "char": "@", "frompalette": "#" },
+    { "char": "Q", "block": "desolation:cooled_ember_block" },
+    { "char": "X", "block": "desolation:activated_charcoal_block" },
+    { "char": "L", "block": "desolation:charred_planks" },
+    { "char": "u", "block": "desolation:charred_slab[type=double]" },
+    { "char": "S", "block": "desolation:charred_slab[type=double]" },
+    { "char": "_", "block": "desolation:charred_slab[type=bottom]" },
+    { "char": "A", "block": "desolation:charred_stairs[facing=west,half=bottom,shape=straight]" },
+    { "char": "t", "block": "desolation:charred_stairs[facing=east,half=bottom,shape=straight]" },
+    { "char": "z", "block": "desolation:charred_stairs[facing=north,half=bottom,shape=straight]" },
+    { "char": "c", "block": "desolation:charred_stairs[facing=south,half=bottom,shape=straight]" },
+    { "char": "d", "block": "desolation:charred_stairs[facing=north,half=top,shape=straight]" },
+    { "char": "o", "block": "desolation:charred_stairs[facing=south,half=bottom,shape=straight]" },
+    { "char": "D", "block": "desolation:charred_soil" },
+    { "char": "*", "block": "desolation:potted_charred_sapling" },
+    { "char": "T", "block": "minecraft:soul_wall_torch[facing=north]", "torch": true },
+    { "char": "1", "block": "minecraft:spawner", "mob": "charredmobs" }
+  ]
+}

@@ -1,0 +1,197 @@
+{
+  "xsize": 16,
+  "zsize": 16,
+  "slices": [
+    [
+      "    rrrrrrrrrr  ",
+      "    rrrrrrrrrr  ",
+      "    rrrrrrrrrr  ",
+      "    rrrrrrrrrr  ",
+      "    rrrrrrrrrr  ",
+      "                ",
+      "nnnnnnnnnnnnnnnn",
+      "                ",
+      "                ",
+      "                ",
+      "nnnn    nnnn    ",
+      "                ",
+      "                ",
+      "                ",
+      "nnnnnnnnnnnnnnnn",
+      "                "
+    ],
+    [
+      "    mmmmmmmmmm  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    meee  eeem  ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "   s        s   "
+    ],
+    [
+      "    mmmmmmmmmm  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    meee  eeem  ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ],
+    [
+      "    mmmmmmmmmm  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    meeeeeeeem  ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ],
+    [
+      "    mmmmmmmmmm  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    m        m  ",
+      "    mmmmmmmmmm  ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ],
+    [
+      "   qqqqqqqqqqqq ",
+      "   qqqqqqqqqqqq ",
+      "   qqqqqqqqqqqq ",
+      "   qqqqqqqqqqqq ",
+      "   qqqqqqqqqqqq ",
+      "   qqqqqqqqqqqq ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ],
+    [
+      "          mmmm  ",
+      "          m  m  ",
+      "          m  m  ",
+      "          mmmm  ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ],
+    [
+      "          eeee  ",
+      "          e  e  ",
+      "          e  e  ",
+      "          eeee  ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ],
+    [
+      "          qqqq  ",
+      "          qqqq  ",
+      "          qqqq  ",
+      "          qqqq  ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                "
+    ]
+  ],
+  "palette": {
+    "palette": [
+      {
+        "char": "n",
+        "block": "minecraft:white_concrete"
+      },
+      {
+        "char": "m",
+        "block": "minecraft:light_gray_concrete"
+      },
+      {
+        "char": "e",
+        "block": "minecraft:light_blue_stained_glass"
+      },
+      {
+        "char": "r",
+        "block": "minecraft:polished_andesite"
+      },
+      {
+        "char": "q",
+        "block": "minecraft:smooth_stone_slab[type=bottom]"
+      },
+      {
+        "char": "s",
+        "block": "minecraft:lantern[hanging=false,waterlogged=false]",
+        "torch": true
+      }
+    ]
+  }
+}

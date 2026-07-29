@@ -1,0 +1,16 @@
+{
+  "type": "lostbuildings:lost_city",
+  "biomes": "#lostbuildings:has_structure/lost_city",
+  "buildings": [
+    "building1",
+    "building2",
+    "building3",
+    "building4",
+    "building5",
+    "building6",
+    "building7",
+    "building8"
+  ],
+  "spawn_overrides": {},
+  "step": "surface_structures"
+}

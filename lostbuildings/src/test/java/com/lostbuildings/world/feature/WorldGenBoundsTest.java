@@ -127,32 +127,35 @@ class WorldGenBoundsTest {
 	// --- invariants of the callers that feed positions to the level ---
 
 	/**
-	 * Every cell a group can claim, and every terrain probe taken over such a cell, has to stay in
-	 * the window. This one assertion protects the site corners, the shared ground level, the
-	 * foundation footprint and the streets, all of which are derived from these two constants.
+	 * A city piece owns exactly one chunk cell and probes only inside it, which is strictly stronger
+	 * than the old write window: the same probes that used to sit at the very edge of a ±1-chunk
+	 * window (a group's outer lattice cell) now sit in the middle of the chunk being generated.
+	 *
+	 * <p>This replaces the old {@code CellLattice.OFFSETS} assertion. The lattice is gone — its job
+	 * of keeping groups from overlapping is done by the structure set's {@code separation} and by
+	 * {@code CityLayout}'s grid — but the window rule it was measured against still governs the
+	 * biome reads below, so the class and this test stay.
 	 */
 	@Test
-	void latticeCellsAndTheirCornerProbesStayInsideTheWindow() {
+	void cityCellProbesStayInsideTheGeneratingChunk() {
 		for (int cx : CHUNKS) {
 			for (int cz : CHUNKS) {
-				for (int[] cell : CellLattice.OFFSETS) {
-					assertTrue(WorldGenBounds.holdsChunk(cx + cell[0], cz + cell[1], cx, cz),
-							"lattice offset " + Arrays.toString(cell) + " leaves the write window");
-
-					int wx = (cx + cell[0]) << 4;
-					int wz = (cz + cell[1]) << 4;
-					// GroupBuildingPlacement.CELL_PROBES samples 0..FOOTPRINT-1 into the cell.
-					for (int px : new int[]{0, 8, 15}) {
-						for (int pz : new int[]{0, 8, 15}) {
-							assertTrue(WorldGenBounds.holdsBlock(wx + px, wz + pz, cx, cz),
-									"cell probe " + px + "," + pz + " of cell " + Arrays.toString(cell));
-						}
-					}
-					// ...and FOOTPRINT (16) would not, which is why the constant is FOOTPRINT - 1.
-					if (cell[0] > 0) {
-						assertFalse(WorldGenBounds.holdsBlock(wx + 16, wz, cx, cz));
+				assertTrue(WorldGenBounds.holdsChunk(cx, cz, cx, cz), "a cell is its own chunk");
+				int wx = cx << 4;
+				int wz = cz << 4;
+				// BuildingPiece.CELL_PROBES / Streets.paveCell sample 0..15 into the cell.
+				for (int px : new int[]{0, 8, 15}) {
+					for (int pz : new int[]{0, 8, 15}) {
+						assertEquals(cx, WorldGenBounds.chunkOf(wx + px),
+								"cell probe " + px + "," + pz + " left the chunk on X");
+						assertEquals(cz, WorldGenBounds.chunkOf(wz + pz),
+								"cell probe " + px + "," + pz + " left the chunk on Z");
+						assertTrue(WorldGenBounds.holdsBlock(wx + px, wz + pz, cx, cz));
 					}
 				}
+				// ...and 16 would not, which is why the probe constants stop at FOOTPRINT - 1.
+				assertFalse(wx + 16 <= ((cx << 4) + 15), "block 16 belongs to the next cell");
+				assertEquals(cx + 1, WorldGenBounds.chunkOf(wx + 16));
 			}
 		}
 	}

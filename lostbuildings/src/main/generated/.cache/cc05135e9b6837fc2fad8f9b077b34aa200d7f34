@@ -1,4 +1,7 @@
 // 26.2	-999999999-01-01T00:00:00	Lost Buildings/Lost Buildings Dynamic Registries
-047e7df6461e919bf6f797d71d9638c5fad7435f data/lostbuildings/worldgen/biome/lost_city.json
-a6af7d3187a26bdef0d8013db53c1935a10229d9 data/lostbuildings/worldgen/configured_feature/lost_building.json
-e454ae13eacc1661ee4b3af8ef04cdbe6b08ab5c data/lostbuildings/worldgen/placed_feature/lost_building.json
+1bdca24dbc743f471b1e9e0692a09446d5eec035 data/lostbuildings/worldgen/biome/lost_city.json
+040de36e38051de085c66a7417757dbc3f093665 data/lostbuildings/worldgen/structure/lost_city.json
+5f39a72d224198f4e4bfda96690562cb7d727fe3 data/lostbuildings/worldgen/structure/oil_rig.json
+79978166d31520e158f79289e83a583b27a795f7 data/lostbuildings/worldgen/structure/scattered.json
+64589bb7cf6ab89f5809b0c88c23ccce87920eb6 data/lostbuildings/worldgen/structure_set/lost_cities.json
+3b33158d2c25c26b8b89f7abfe5b6a082d8952bd data/lostbuildings/worldgen/structure_set/scattered.json

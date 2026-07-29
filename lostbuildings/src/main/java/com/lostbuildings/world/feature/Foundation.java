@@ -5,6 +5,7 @@ import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
  * Foundation / terrain fitting for a placed building, analog of Lost Cities'
@@ -78,9 +79,20 @@ public final class Foundation {
 					cursor.set(wx, y, wz);
 				}
 
+				// Nothing above the column's surface can match either loop's test: WORLD_SURFACE_WG
+				// is maintained by every setBlock and its predicate is "not air", so getHeight()
+				// returns one past the highest non-air block and everything at or above it is air —
+				// which is neither `!isAir()` nor `liquid()`. Probing those blocks one at a time cost
+				// ~14.8k of the 15.1k getBlockState calls this method made per building (measured, a
+				// 16x16 site cleared 58 blocks high); one heightmap lookup per column replaces them.
+				// The bound is only ever an upper one, and clearing lowers the surface, so reading it
+				// once before the loops stays valid all the way down.
+				int surfaceTop = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, wx, wz);
+
 				// 2) Clear the building volume: hillsides, trees AND liquids all go. Liquids used
 				//    to be skipped here, which is exactly why buildings generated flooded.
-				for (int cy = baseY; cy < clearTop; cy++) {
+				int clearEnd = Math.min(clearTop, surfaceTop);
+				for (int cy = baseY; cy < clearEnd; cy++) {
 					cursor.set(wx, cy, wz);
 					if (!level.getBlockState(cursor).isAir()) {
 						level.setBlock(cursor, AIR, WorldGenFlags.SET_BLOCK);
@@ -88,7 +100,8 @@ public final class Foundation {
 				}
 
 				// 3) Above the building, remove liquid only (never carve terrain) up to sea level.
-				for (int cy = clearTop; cy < drainTop; cy++) {
+				int drainEnd = Math.min(drainTop, surfaceTop);
+				for (int cy = clearTop; cy < drainEnd; cy++) {
 					cursor.set(wx, cy, wz);
 					if (level.getBlockState(cursor).liquid()) {
 						level.setBlock(cursor, AIR, WorldGenFlags.SET_BLOCK);
