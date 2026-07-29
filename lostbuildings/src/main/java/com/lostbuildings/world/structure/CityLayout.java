@@ -432,4 +432,33 @@ public final class CityLayout {
 		int median = samples[samples.length / 2];
 		return Math.floorDiv(median + floorHeight / 2, floorHeight) * floorHeight;
 	}
+
+	/**
+	 * How much the terrain under a city actually varies, as the spread between its 10th and 90th
+	 * percentile sample.
+	 *
+	 * <p><b>Why percentiles and not {@code max - min}.</b> Same reason {@link #groundLevelFrom} is a
+	 * median: over a 144×144 city a single spire or ravine is not a description of the site. Peak to
+	 * trough would reject a perfectly buildable plain because one lot happens to contain a pond, and
+	 * it is precisely the outlier sensitivity the median was introduced to escape. The 10–90 band
+	 * ignores the extreme fifth of the lots and reports the relief the city is actually spread over.
+	 *
+	 * <p>Both ends are needed. The city sits at the median, so the p90 end is the terrain that will
+	 * stand above the streets and must be dug away, and the p10 end is the terrain the roads have to
+	 * be carried down onto. A slope is bad in either direction.
+	 *
+	 * @param samples terrain heights over the city's built-on lots; reordered in place
+	 * @return the 10th-to-90th percentile spread in blocks, or {@code 0} when there are no samples
+	 */
+	public static int groundSpreadFrom(int[] samples) {
+		if (samples.length == 0) {
+			return 0;
+		}
+		java.util.Arrays.sort(samples);
+		// Drop a tenth off each end. Clamped so the two indices can never cross: below ten samples
+		// the trim is nothing and this degrades to peak-to-trough, which is the honest answer when
+		// there are too few samples to call anything an outlier.
+		int trim = Math.min(samples.length / 10, (samples.length - 1) / 2);
+		return samples[samples.length - 1 - trim] - samples[trim];
+	}
 }

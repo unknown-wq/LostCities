@@ -42,10 +42,17 @@ public final class Streets {
 	 * <p>Buildings have always excavated what stands above them ({@code BuildingPiece.clearHeight}
 	 * carries a 64-block allowance); streets cleared a flat {@link #CLEARANCE} and nothing more, so
 	 * on any city whose level fell below the surrounding surface the roads stayed entombed while the
-	 * houses around them stood in open pits. The cap keeps a road from carving a trench through a
-	 * mountainside: past it the cell is left alone rather than mined out.
+	 * houses around them stood in open pits.
+	 *
+	 * <p><b>This matches the buildings' 64 deliberately.</b> It was 24, which is worse than either
+	 * extreme: the houses were dug out and the roads between them were not, so past 24 blocks of
+	 * slope a city came out as open pits joined by tunnels. Whatever the right amount of excavation
+	 * is, it has to be the same number for both, or the city disagrees with itself. Sites too steep
+	 * to excavate at all are now refused outright before any of this runs — see
+	 * {@code LostCityConfig.DEFAULT_MAX_HEIGHT_DIFF} — which is the honest place to draw that line,
+	 * rather than half-digging a mountainside and leaving the result to the player.
 	 */
-	private static final int MAX_HEADROOM = 24;
+	private static final int MAX_HEADROOM = 64;
 	/** How far the road may be carried on fill before the column is abandoned. */
 	private static final int MAX_EMBANKMENT = 8;
 

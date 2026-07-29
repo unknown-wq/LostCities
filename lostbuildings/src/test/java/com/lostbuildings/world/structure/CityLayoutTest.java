@@ -470,6 +470,59 @@ class CityLayoutTest {
 		assertEquals(Integer.MIN_VALUE, CityLayout.groundLevelFrom(new int[0], 6));
 	}
 
+	/** Flat ground has no spread worth speaking of, so a plain is never refused. */
+	@Test
+	void flatGroundHasNoSpread() {
+		assertEquals(0, CityLayout.groundSpreadFrom(new int[]{70, 70, 70, 70, 70, 70, 70, 70, 70, 70}));
+		assertTrue(CityLayout.groundSpreadFrom(new int[]{69, 70, 71, 70, 69, 71, 70, 70, 71, 69}) <= 2,
+				"gentle undulation must not read as a slope");
+	}
+
+	/**
+	 * The whole reason the spread is a percentile band and not {@code max - min}: one pond or one
+	 * spire is not a description of the site, and must not veto a city the same way it must not move
+	 * the ground level.
+	 */
+	@Test
+	void oneOutlierDoesNotLookLikeASlope() {
+		int[] pond = {70, 70, 70, 70, 70, 70, 70, 70, 70, 20};
+		int[] spire = {70, 70, 70, 70, 70, 70, 70, 70, 70, 140};
+
+		assertTrue(CityLayout.groundSpreadFrom(pond) <= 2,
+				"a single pond read as " + CityLayout.groundSpreadFrom(pond) + " blocks of relief");
+		assertTrue(CityLayout.groundSpreadFrom(spire) <= 2,
+				"a single spire read as " + CityLayout.groundSpreadFrom(spire) + " blocks of relief");
+	}
+
+	/** A genuine hillside is what the check is for, and it has to be seen. */
+	@Test
+	void aRealSlopeIsReported() {
+		int[] hillside = {64, 68, 72, 76, 80, 84, 88, 92, 96, 100};
+
+		assertTrue(CityLayout.groundSpreadFrom(hillside) >= 24,
+				"a 36-block climb across the city read as only "
+						+ CityLayout.groundSpreadFrom(hillside) + " blocks");
+	}
+
+	/**
+	 * Half in a valley and half on a ridge is the case that produced the bug report: the median puts
+	 * the city between them, so it cuts into one half and stands on fill over the other. Neither end
+	 * is an outlier here, and the spread has to say so.
+	 */
+	@Test
+	void aCitySplitBetweenValleyAndRidgeIsSeenAsSteep() {
+		int[] split = {64, 64, 64, 64, 64, 96, 96, 96, 96, 96};
+
+		assertTrue(CityLayout.groundSpreadFrom(split) >= 30,
+				"valley and ridge read as " + CityLayout.groundSpreadFrom(split) + " blocks apart");
+	}
+
+	/** No samples must not be reported as infinitely steep, or a degenerate plan is refused twice. */
+	@Test
+	void emptySampleSetHasNoSpread() {
+		assertEquals(0, CityLayout.groundSpreadFrom(new int[0]));
+	}
+
 	/** Same samples, same answer — the level is part of the deterministic city description. */
 	@Test
 	void groundLevelIsDeterministic() {

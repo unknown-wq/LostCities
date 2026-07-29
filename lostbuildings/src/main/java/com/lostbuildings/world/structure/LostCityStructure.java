@@ -87,9 +87,16 @@ public class LostCityStructure extends Structure {
 			return Optional.empty();   // cannot happen: the centre cell is unconditional
 		}
 
-		int groundY = groundLevel(context, plan);
+		int[] samples = terrainSamples(context, plan);
+		int groundY = groundLevel(samples, context);
 		int minY = context.heightAccessor().getMinY();
 		if (groundY <= minY + LostCityConfig.FLOOR_HEIGHT) {
+			return Optional.empty();
+		}
+		// A city stands at one level over its whole footprint, so a site with too much relief cannot
+		// be built on without cutting into the hill above it and standing on fill below it.
+		int maxDiff = this.config.maxHeightDiff();
+		if (maxDiff > 0 && CityLayout.groundSpreadFrom(samples) > maxDiff) {
 			return Optional.empty();
 		}
 
@@ -179,7 +186,7 @@ public class LostCityStructure extends Structure {
 	 * unit-tested there, including the regression this replaced (a minimum over a 144-block-wide
 	 * city sinks the whole settlement to its deepest sample and buries the streets).
 	 */
-	private static int groundLevel(Structure.GenerationContext context, CityLayout.Plan plan) {
+	private static int[] terrainSamples(Structure.GenerationContext context, CityLayout.Plan plan) {
 		ChunkGenerator generator = context.chunkGenerator();
 		int[] samples = new int[plan.cells().size() * CELL_CORNERS.length];
 		int n = 0;
@@ -195,9 +202,22 @@ public class LostCityStructure extends Structure {
 						context.heightAccessor(), context.randomState());
 			}
 		}
-		int level = CityLayout.groundLevelFrom(java.util.Arrays.copyOf(samples, n), LostCityConfig.FLOOR_HEIGHT);
+		return java.util.Arrays.copyOf(samples, n);
+	}
+
+	/**
+	 * The city's shared level from those samples, or sea level snapped to a storey when a plan
+	 * somehow has no built-on cell to sample.
+	 *
+	 * <p>Both statistics — the level and the spread that vetoes the site — are taken from the
+	 * <em>same</em> array, so the two decisions cannot be made on different terrain. Note both sort
+	 * it in place, which is harmless here and is why the array is ours rather than the caller's.
+	 */
+	private static int groundLevel(int[] samples, Structure.GenerationContext context) {
+		int level = CityLayout.groundLevelFrom(samples, LostCityConfig.FLOOR_HEIGHT);
 		return level == Integer.MIN_VALUE
-				? Math.floorDiv(generator.getSeaLevel(), LostCityConfig.FLOOR_HEIGHT) * LostCityConfig.FLOOR_HEIGHT
+				? Math.floorDiv(context.chunkGenerator().getSeaLevel(), LostCityConfig.FLOOR_HEIGHT)
+						* LostCityConfig.FLOOR_HEIGHT
 				: level;
 	}
 

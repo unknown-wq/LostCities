@@ -57,11 +57,28 @@ public record LostCityConfig(
 		float density,
 		int cellars,
 		float damageChance,
+		int maxHeightDiff,
 		StreetSettings streets,
 		ContentSettings content
 ) {
 	/** Storeys are 6 blocks tall in the engine; the ground level is snapped to a multiple of this. */
 	public static final int FLOOR_HEIGHT = 6;
+
+	/**
+	 * How much the terrain under a city may vary, 10th to 90th percentile, before the site is
+	 * refused outright.
+	 *
+	 * <p>A city stands at one shared level over its whole 144×144 footprint, so on a mountainside it
+	 * cannot help but cut into the hill above and stand on fill below. Until this existed nothing
+	 * stopped it: {@code ScatteredStructure} refused a site whose probes disagreed by more than four
+	 * blocks — a single cabin was fussier about its ground than a whole city was.
+	 *
+	 * <p>Three storeys is the threshold. It passes plains, beaches and rolling hills, where the
+	 * relief is a few blocks and the foundations absorb it, and refuses the mountainsides where a
+	 * city reads as driven into the rock. Raise it for a mod that wants cities carved into cliffs;
+	 * set it to {@code 0} to disable the check and take whatever the grid offers.
+	 */
+	public static final int DEFAULT_MAX_HEIGHT_DIFF = 18;
 
 	/**
 	 * Everything about the cells between the buildings.
@@ -142,6 +159,7 @@ public record LostCityConfig(
 			Codec.floatRange(0.0F, 1.0F).optionalFieldOf("density", 0.85F).forGetter(LostCityConfig::density),
 			Codec.intRange(0, PlaceSettings.MAX_CELLARS).optionalFieldOf("cellars", 1).forGetter(LostCityConfig::cellars),
 			Codec.floatRange(0.0F, 1.0F).optionalFieldOf("damage_chance", 0.2F).forGetter(LostCityConfig::damageChance),
+			Codec.intRange(0, 255).optionalFieldOf("max_height_diff", DEFAULT_MAX_HEIGHT_DIFF).forGetter(LostCityConfig::maxHeightDiff),
 			StreetSettings.MAP_CODEC.codec().optionalFieldOf("streets", StreetSettings.defaults()).forGetter(LostCityConfig::streets),
 			ContentSettings.MAP_CODEC.codec().optionalFieldOf("content", ContentSettings.defaults()).forGetter(LostCityConfig::content)
 	).apply(instance, LostCityConfig::new));
@@ -159,6 +177,7 @@ public record LostCityConfig(
 				0.85F,
 				1,
 				0.2F,
+				DEFAULT_MAX_HEIGHT_DIFF,
 				StreetSettings.defaults(),
 				ContentSettings.defaults());
 	}
