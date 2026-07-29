@@ -54,12 +54,17 @@ public final class DamageArea {
 	/** A building that took no damage at all. Shared, immutable, and free. */
 	public static final DamageArea NONE = new DamageArea(List.of(), 0.0f, 0);
 
-	private final List<Explosion> explosions;
+	/**
+	 * Held as an array rather than a {@code List}: {@link #damageAt} is called once for every block
+	 * a building places (about 3,700), and a for-each over a {@code List} allocates an iterator on
+	 * every one of them.
+	 */
+	private final Explosion[] explosions;
 	private final float damageChance;
 	private final int groundY;
 
 	private DamageArea(List<Explosion> explosions, float damageChance, int groundY) {
-		this.explosions = explosions;
+		this.explosions = explosions.toArray(new Explosion[0]);
 		this.damageChance = damageChance;
 		this.groundY = groundY;
 	}
@@ -124,11 +129,11 @@ public final class DamageArea {
 	}
 
 	public List<Explosion> explosions() {
-		return explosions;
+		return List.of(explosions);
 	}
 
 	public boolean hasExplosions() {
-		return !explosions.isEmpty();
+		return explosions.length > 0;
 	}
 
 	/**
@@ -153,10 +158,35 @@ public final class DamageArea {
 			return 0.0f;
 		}
 		float damage = weathering(floor);
-		for (Explosion explosion : explosions) {
-			damage += explosion.damageAt(x, y, z);
+		for (int i = 0; i < explosions.length; i++) {
+			damage += explosions[i].damageAt(x, y, z);
 		}
 		return damage;
+	}
+
+	/**
+	 * The damage that applies to <em>every</em> position of an axis-aligned box, or a negative
+	 * number when a blast reaches into the box and the caller has to ask position by position.
+	 *
+	 * <p>A blast sphere contributes exactly {@code 0.0f} outside itself, so when none of them
+	 * touches the box {@link #damageAt} is {@link #weathering(int)} for every position in it — the
+	 * same float, by the same arithmetic. Buildings are generated a 16×16 part at a time and at the
+	 * shipped {@code damage_chance} of 0.2 most parts are nowhere near a crater, so hoisting this out
+	 * of the per-block loop takes the explosion walk (and, before this, an iterator allocation) off
+	 * roughly 3,000 of a building's 3,700 placed blocks.
+	 *
+	 * @param floor storey index, as for {@link #weathering(int)}
+	 */
+	public float uniformDamageIn(int floor, int minX, int minY, int minZ, int maxX, int maxY, int maxZ) {
+		if (damageChance <= 0.0f) {
+			return 0.0f;
+		}
+		for (int i = 0; i < explosions.length; i++) {
+			if (explosions[i].intersects(minX, minY, minZ, maxX, maxY, maxZ)) {
+				return -1.0f;
+			}
+		}
+		return weathering(floor);
 	}
 
 	/**

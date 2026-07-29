@@ -13,6 +13,7 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.StairsShape;
 import net.minecraft.world.level.block.state.properties.WallSide;
 import net.minecraft.core.Direction;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * Common block states and per-block "connectable state" correction. Connection flags for
@@ -43,6 +44,21 @@ public final class BlockStates {
     private BlockStates() {
     }
 
+    /**
+     * Whether a neighbour is something a pane/fence/bar/wall connects to.
+     *
+     * <p><b>This answer depends on the neighbour's <em>block</em>, never on its connection
+     * state.</b> {@code isAir()} and {@code canOcclude()} are both per-block flags copied into every
+     * state of that block by {@code BlockBehaviour.Properties}, and
+     * {@code Block.isExceptionForConnection} is a list of block identities. The same is true of the
+     * stair tests below, which read a neighbour's {@code FACING}/{@code HALF} (set by the palette)
+     * and never its {@code SHAPE} (set here).
+     *
+     * <p>That is the invariant the engine's two-pass correction rests on: a connectable written to
+     * the world <em>before</em> it has been corrected cannot change the answer any other block gets,
+     * so the first pass may place the palette's raw state and leave all the correcting to the second
+     * pass. {@code EngineConnectionPassTest} pins it.
+     */
     private static boolean canAttach(BlockState state) {
         if (state.isAir()) {
             return false;
@@ -62,6 +78,20 @@ public final class BlockStates {
      * Returns null for STRUCTURE_VOID (meaning: leave whatever is already there).
      */
     public static BlockState correct(WorldGenLevel level, BlockPos pos, BlockState state) {
+        return correct(level, null, pos, state);
+    }
+
+    /**
+     * Correct a connectable block state against its neighbours in the world, using a caller-supplied
+     * cursor for the four neighbour probes.
+     *
+     * <p>A caller that corrects many blocks in a row (the engine's second connection pass does one
+     * per connectable, ~400 per building) hands in one cursor for the whole loop instead of paying
+     * for a fresh {@link BlockPos.MutableBlockPos} per block. {@code null} is accepted so the
+     * three-argument form stays a one-liner; the cursor must not alias {@code pos}.
+     */
+    public static BlockState correct(WorldGenLevel level, @Nullable BlockPos.MutableBlockPos cursor,
+                                     BlockPos pos, BlockState state) {
         Block block = state.getBlock();
         if (block instanceof StructureVoidBlock) {
             return null;
@@ -69,24 +99,34 @@ public final class BlockStates {
         // Hot path: this runs for every block a building places, so bail out before touching the
         // world for anything that has no connection state at all (that is ~99% of the blocks).
         if (block instanceof CrossCollisionBlock) {
-            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            BlockPos.MutableBlockPos m = cursor == null ? new BlockPos.MutableBlockPos() : cursor;
             return state.setValue(CrossCollisionBlock.WEST, canAttach(neighbour(level, m, pos, Direction.WEST)))
                     .setValue(CrossCollisionBlock.EAST, canAttach(neighbour(level, m, pos, Direction.EAST)))
                     .setValue(CrossCollisionBlock.NORTH, canAttach(neighbour(level, m, pos, Direction.NORTH)))
                     .setValue(CrossCollisionBlock.SOUTH, canAttach(neighbour(level, m, pos, Direction.SOUTH)));
         }
         if (block instanceof WallBlock) {
-            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            BlockPos.MutableBlockPos m = cursor == null ? new BlockPos.MutableBlockPos() : cursor;
             return state.setValue(WallBlock.WEST, canAttachWall(neighbour(level, m, pos, Direction.WEST)))
                     .setValue(WallBlock.EAST, canAttachWall(neighbour(level, m, pos, Direction.EAST)))
                     .setValue(WallBlock.NORTH, canAttachWall(neighbour(level, m, pos, Direction.NORTH)))
                     .setValue(WallBlock.SOUTH, canAttachWall(neighbour(level, m, pos, Direction.SOUTH)));
         }
         if (block instanceof StairBlock) {
-            BlockPos.MutableBlockPos m = new BlockPos.MutableBlockPos();
+            BlockPos.MutableBlockPos m = cursor == null ? new BlockPos.MutableBlockPos() : cursor;
             return state.setValue(StairBlock.SHAPE, getShapeProperty(level, m, state, pos));
         }
         return state;
+    }
+
+    /**
+     * Whether a block's own state can carry connections that {@link #correct} would fill in.
+     *
+     * <p>Public because the engine has to know, without correcting, which of the blocks it places
+     * need to come back for the second pass.
+     */
+    public static boolean isConnectable(Block block) {
+        return block instanceof CrossCollisionBlock || block instanceof WallBlock || block instanceof StairBlock;
     }
 
     /**

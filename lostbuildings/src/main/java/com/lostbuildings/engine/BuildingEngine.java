@@ -15,10 +15,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.Identifier;
 import net.minecraft.util.RandomSource;
 import net.minecraft.world.level.WorldGenLevel;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.world.level.block.Block;
-import net.minecraft.world.level.block.CrossCollisionBlock;
-import net.minecraft.world.level.block.StairBlock;
-import net.minecraft.world.level.block.WallBlock;
+import net.minecraft.world.level.block.StructureVoidBlock;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -40,8 +39,9 @@ import java.util.concurrent.ConcurrentHashMap;
  * Three features were added without changing the shape of {@link #generateBuilding}:
  * <ul>
  *   <li><b>Cellars</b> ({@link PlaceSettings#cellars}). The storey loop runs from {@code -cellars}
- *       upward. Each cellar slice is carved to air before its part is written — see
- *       {@link #carveCellar} for why that is not optional.</li>
+ *       upward. Whatever a cellar's part does not fill is carved to air right after it — see
+ *       {@link #carveCellar} for why that is not optional, and why it runs after rather than
+ *       before.</li>
  *   <li><b>Damage</b> ({@link PlaceSettings#damageChance}). {@link DamageArea} lays out blast
  *       spheres and per-storey weathering; {@link Weathering} turns a damage number into a block
  *       swap. At {@code damageChance == 0} not a single extra number is drawn from the building's
@@ -138,9 +138,9 @@ public class BuildingEngine {
      * one block under the building base; run unchanged against a building with cellars it would
      * simply backfill the hole. Callers that pass {@code cellars > 0} must therefore either keep
      * their support pillars below {@code origin.getY() - cellarDepth(settings)} or size the piece's
-     * bounding box to include it. The engine defends itself as well ({@link #carveCellar} re-clears
-     * every cellar slice before writing it), so a caller that forgets does not produce a solid
-     * block of cobblestone — it only wastes the writes.
+     * bounding box to include it. The engine defends itself as well ({@link #carveCellar} clears
+     * whatever is left standing in every cellar slice), so a caller that forgets does not produce a
+     * solid block of cobblestone — it only wastes the writes.
      */
     public static int cellarDepth(PlaceSettings settings) {
         return settings.cellars() * FLOORHEIGHT;
@@ -178,10 +178,11 @@ public class BuildingEngine {
         ConditionContext base = new ConditionContext(0, floors, cellars, null, b.getName(),
                 chunkX, chunkZ, s.role());
 
-        // Positions of connectable blocks (panes/bars/fences/walls/stairs) placed by this building.
-        // They are re-corrected in a second pass below, once every neighbour exists — otherwise a
-        // block placed before its same-building neighbour never sees it and stays disconnected.
-        List<BlockPos> connectables = new ArrayList<>();
+        // Positions of connectable blocks (panes/bars/fences/walls/stairs) placed by this building,
+        // packed with BlockPos.asLong(). They are corrected in a single pass below, once every
+        // neighbour exists — a block corrected as it is placed cannot see the neighbours that come
+        // after it, and correcting it twice is just the first answer thrown away.
+        LongArrayList connectables = new LongArrayList();
 
         int footprintX = 0;
         int footprintZ = 0;
@@ -206,25 +207,47 @@ public class BuildingEngine {
                 continue;
             }
             int height = f * FLOORHEIGHT;
-            if (f < 0) {
-                carveCellar(level, origin, part, height);
-            }
             footprintX = Math.max(footprintX, part.getXSize());
             footprintZ = Math.max(footprintZ, part.getZSize());
+            // A cellar records which of its cells it actually filled, so the carve below only has to
+            // deal with the rest. Nothing above ground needs the bookkeeping.
+            CarveMask mask = f < 0 ? new CarveMask(part) : null;
             generatePart(level, origin, part, t, 0, height, 0, palette, rand, s,
-                    connectables, ctx.inPart(part.getName()), damage);
+                    connectables, ctx.inPart(part.getName()), damage, mask);
+            if (mask != null) {
+                carveCellar(level, origin, part, height, mask);
+            }
         }
 
         if (!damage.isIntact()) {
             scatterRubble(level, origin, b, palette, rand, damage, footprintX, footprintZ);
         }
 
-        // Second correction pass: now the whole building is in the world, so pane/bar/fence/wall
-        // connections and stair shapes resolve against all four neighbours (bug: adjacent stained
-        // glass panes were not connecting because the neighbour was placed after correction).
-        for (BlockPos pos : connectables) {
+        correctConnections(level, connectables);
+    }
+
+    /**
+     * Resolve pane/bar/fence/wall connections and stair shapes, once the whole building is in the
+     * world so that all four neighbours of every connectable exist.
+     *
+     * <p><b>Why this is the only correction pass.</b> Connections used to be resolved twice: once as
+     * each block was placed and again here. The first answer was always discarded — this pass
+     * overwrites every one of the four connection properties (or, for a stair, the shape) from the
+     * finished world, and a block whose neighbours had not been placed yet could only have got it
+     * wrong. It was not free either: it cost four {@code getBlockState} calls per connectable, about
+     * 1,500 per building. Dropping it is safe because a half-corrected block in the world cannot
+     * change anyone else's answer — see {@code BlockStates.canAttach} for the invariant and
+     * {@code EngineConnectionPassTest} for the test that pins it.
+     */
+    private static void correctConnections(WorldGenLevel level, LongArrayList connectables) {
+        // Two cursors: one addressing the block being corrected, one for the neighbour probes.
+        BlockPos.MutableBlockPos pos = new BlockPos.MutableBlockPos();
+        BlockPos.MutableBlockPos probe = new BlockPos.MutableBlockPos();
+        for (int i = 0; i < connectables.size(); i++) {
+            long packed = connectables.getLong(i);
+            pos.set(BlockPos.getX(packed), BlockPos.getY(packed), BlockPos.getZ(packed));
             BlockState cur = level.getBlockState(pos);
-            BlockState fixed = BlockStates.correct(level, pos, cur);
+            BlockState fixed = BlockStates.correct(level, probe, pos, cur);
             if (fixed != null && fixed != cur) {
                 level.setBlock(pos, fixed, SET_FLAGS);
             }
@@ -286,24 +309,84 @@ public class BuildingEngine {
     }
 
     /**
-     * Clear one cellar slice before its part is written.
+     * Which cells of a cellar part its own generation filled — one bit per cell of the part's
+     * enclosing square.
+     *
+     * <p>Coordinates are offsets from the building origin, so they line up with what
+     * {@link #carveCellar} iterates: {@code x} and {@code z} are the <em>rotated</em> offsets the
+     * part actually wrote to, {@code y} counts slices from the bottom of the storey. A part's
+     * enclosing square is at most 16×16×16, i.e. 4096 bits, so the mask is 64 longs at worst and one
+     * is allocated per cellar (at most {@link PlaceSettings#MAX_CELLARS} per building).
+     */
+    private static final class CarveMask {
+
+        private final int extent;
+        private final int slices;
+        private final long[] bits;
+
+        CarveMask(BuildingPart part) {
+            // Square extent: a rotated non-square part occupies the transposed rectangle.
+            this.extent = Math.max(part.getXSize(), part.getZSize());
+            this.slices = part.getSliceCount();
+            this.bits = new long[((extent * extent * Math.max(slices, 1)) + 63) >> 6];
+        }
+
+        private int index(int x, int y, int z) {
+            if (x < 0 || z < 0 || y < 0 || x >= extent || z >= extent || y >= slices) {
+                return -1;
+            }
+            return (x * extent + z) * slices + y;
+        }
+
+        void mark(int x, int y, int z) {
+            int i = index(x, y, z);
+            if (i >= 0) {
+                bits[i >> 6] |= 1L << (i & 63);
+            }
+        }
+
+        boolean isFilled(int x, int y, int z) {
+            int i = index(x, y, z);
+            return i >= 0 && (bits[i >> 6] & (1L << (i & 63))) != 0;
+        }
+    }
+
+    /**
+     * Clear whatever is left standing inside a cellar slice once its part has been written.
      *
      * <p>This is not belt-and-braces. The placement pass runs {@code Foundation} first, and
      * {@code Foundation} pillars solid fill downward from below the building base — straight through
-     * the volume the cellar is about to occupy. A palette's "air" character means <em>leave the
-     * world alone</em>, so without this pass a cellar would be generated as a solid block of
-     * foundation fill with a doorway painted on it.
+     * the volume the cellar occupies. A palette's "air" character means <em>leave the world
+     * alone</em>, so without this pass a cellar would be generated as a solid block of foundation
+     * fill with a doorway painted on it.
+     *
+     * <p><b>Why it runs after the part rather than before it.</b> Carving first meant every cell the
+     * part was about to fill got written twice — air, then the block — and read once to decide on
+     * the air. That was about 565 wasted reads and 565 wasted writes per building, close to half the
+     * carve. Running afterwards and skipping the cells {@code mask} says the part filled produces the
+     * identical world: a cell the part filled ends up holding the part's block either way, and a cell
+     * it did not fill still holds exactly what it held before the part ran.
+     *
+     * <p>The order is only interchangeable because {@link #generatePart} never reads the world —
+     * connections are resolved afterwards by {@link #correctConnections}, which is what took the last
+     * read out of the placement loop. {@code EngineCellarCarveTest} pins both halves of that.
      */
-    private void carveCellar(WorldGenLevel level, BlockPos origin, BuildingPart part, int height) {
+    private void carveCellar(WorldGenLevel level, BlockPos origin, BuildingPart part, int height,
+                             CarveMask mask) {
         BlockPos.MutableBlockPos cursor = new BlockPos.MutableBlockPos();
         int slices = part.getSliceCount();
-        // Square extent: a rotated non-square part occupies the transposed rectangle, and carving
-        // the enclosing square costs nothing (WorldGenBounds clips anything outside the cell).
+        // Carving the enclosing square costs nothing (WorldGenBounds clips anything outside the cell).
         int extent = Math.max(part.getXSize(), part.getZSize());
+        int originX = origin.getX();
+        int originY = origin.getY() + height;
+        int originZ = origin.getZ();
         for (int x = 0; x < extent; x++) {
             for (int z = 0; z < extent; z++) {
                 for (int y = 0; y < slices; y++) {
-                    cursor.set(origin.getX() + x, origin.getY() + height + y, origin.getZ() + z);
+                    if (mask.isFilled(x, y, z)) {
+                        continue;   // the part already put a block here
+                    }
+                    cursor.set(originX + x, originY + y, originZ + z);
                     if (!WorldGenBounds.canRead(level, cursor)) {
                         continue;
                     }
@@ -360,7 +443,8 @@ public class BuildingEngine {
      */
     private int generatePart(WorldGenLevel level, BlockPos origin, IBuildingPart part, Transform transform,
                              int ox, int oy, int oz, CompiledPalette basePalette, RandomSource rand, PlaceSettings s,
-                             List<BlockPos> connectables, ConditionContext ctx, DamageArea damage) {
+                             LongArrayList connectables, ConditionContext ctx, DamageArea damage,
+                             @Nullable CarveMask mask) {
         CompiledPalette compiledPalette = basePalette;
         Palette partPalette = part.getLocalPalette(assets);
         if (partPalette != null) {
@@ -379,6 +463,14 @@ public class BuildingEngine {
         int originX = origin.getX();
         int originY = origin.getY();
         int originZ = origin.getZ();
+        // Blast spheres are laid out per building, not per block, so ask once whether any of them
+        // reaches this part's enclosing box at all. When none does, every position in the part takes
+        // exactly the storey's weathering and the per-block sphere walk is dead work.
+        int extent = Math.max(xSize, zSize);
+        int floor = ctx.floor();
+        float uniformDamage = damage.uniformDamageIn(floor,
+                originX + ox, originY + oy, originZ + oz,
+                originX + ox + extent - 1, originY + oy + part.getSliceCount() - 1, originZ + oz + extent - 1);
         for (int x = 0; x < xSize; x++) {
             for (int z = 0; z < zSize; z++) {
                 char[] vs = part.getVSlice(x, z);
@@ -416,9 +508,11 @@ public class BuildingEngine {
 
                     // Damage first: a block that the blast ate never becomes a chest or a spawner,
                     // and a block that only weathered keeps whatever the palette attached to it.
-                    // damageAt() returns 0 for an undamaged building, and Weathering short-circuits
-                    // on 0 without drawing anything, so this whole branch is free at damageChance 0.
-                    float dmg = damage.damageAt(pos.getX(), pos.getY(), pos.getZ(), ctx.floor());
+                    // uniformDamage is 0 for an undamaged building and Weathering short-circuits on
+                    // 0 without drawing anything, so this whole branch is free at damageChance 0.
+                    float dmg = uniformDamage >= 0.0f
+                            ? uniformDamage
+                            : damage.damageAt(pos.getX(), pos.getY(), pos.getZ(), floor);
                     if (dmg > 0.0f) {
                         BlockState after = Weathering.damage(b, dmg, pos.getY(), s.waterLevel(), compiledPalette, rand);
                         if (after != b) {
@@ -451,16 +545,21 @@ public class BuildingEngine {
                         }
                     }
 
-                    BlockState corrected = BlockStates.correct(level, pos, b);
-                    if (corrected == null) {
-                        continue;   // STRUCTURE_VOID passthrough
+                    Block cb = b.getBlock();
+                    if (cb instanceof StructureVoidBlock) {
+                        continue;   // STRUCTURE_VOID passthrough: leave whatever is already there
                     }
-                    level.setBlock(pos, corrected, SET_FLAGS);
+                    // Placed raw. Connections are resolved once, by correctConnections(), after the
+                    // last storey — doing it here as well only produced an answer that pass then
+                    // recomputed from the finished building.
+                    level.setBlock(pos, b, SET_FLAGS);
                     attachBlockEntity(level, pos, pendingBlockEntity);
 
-                    Block cb = corrected.getBlock();
-                    if (cb instanceof CrossCollisionBlock || cb instanceof WallBlock || cb instanceof StairBlock) {
-                        connectables.add(pos.immutable());
+                    if (BlockStates.isConnectable(cb)) {
+                        connectables.add(pos.asLong());
+                    }
+                    if (mask != null) {
+                        mask.mark(rx - ox, y, rz - oz);
                     }
                 }
             }
