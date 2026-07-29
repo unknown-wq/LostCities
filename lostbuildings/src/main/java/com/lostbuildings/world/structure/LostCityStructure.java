@@ -2,6 +2,7 @@ package com.lostbuildings.world.structure;
 
 import com.lostbuildings.registry.ModStructureTypes;
 import com.lostbuildings.world.feature.StyleSelector;
+import com.lostbuildings.world.structure.piece.AirportPiece;
 import com.lostbuildings.world.structure.piece.BridgePiece;
 import com.lostbuildings.world.structure.piece.BuildingPiece;
 import com.lostbuildings.world.structure.piece.ParkPiece;
@@ -112,7 +113,13 @@ public class LostCityStructure extends Structure {
 	private void addPieces(StructurePiecesBuilder builder, Structure.GenerationContext context,
 	                       CityLayout.Plan plan, int groundY, String style, StyleSelector.Climate climate) {
 		LostCityConfig.StreetSettings streets = this.config.streets();
+		// One airfield per city, on the outer ring. It takes its three cells over from whatever the
+		// layout put there, so those cells are skipped rather than built twice.
+		Airport airport = Airport.forPlan(plan, context.seed());
 		for (CityLayout.Cell cell : plan.cells()) {
+			if (airport.claims(cell)) {
+				continue;
+			}
 			switch (cell.role()) {
 				case BUILDING -> builder.addPiece(new BuildingPiece(
 						cell.chunkX(), cell.chunkZ(), groundY,
@@ -146,6 +153,9 @@ public class LostCityStructure extends Structure {
 					}
 				}
 			}
+		}
+		for (Airport.Segment segment : airport.segments()) {
+			builder.addPiece(new AirportPiece(segment, groundY, style, climate));
 		}
 	}
 

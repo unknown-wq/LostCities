@@ -1,0 +1,71 @@
+{
+  "xsize": 16,
+  "zsize": 16,
+  "slices": [
+    [
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "nnnnnnnnnnnnnnnn",
+      "nnnnnn          ",
+      "                ",
+      "nnnnnn          ",
+      "        nnnn    ",
+      "nnnnnn          ",
+      "                ",
+      "nnnnnn          ",
+      "nnnnnnnnnnnnnnnn",
+      "                "
+    ],
+    [
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "                ",
+      "   s        s   "
+    ]
+  ],
+  "palette": {
+    "palette": [
+      {
+        "char": "n",
+        "block": "minecraft:white_concrete"
+      },
+      {
+        "char": "m",
+        "block": "minecraft:light_gray_concrete"
+      },
+      {
+        "char": "e",
+        "block": "minecraft:light_blue_stained_glass"
+      },
+      {
+        "char": "r",
+        "block": "minecraft:polished_andesite"
+      },
+      {
+        "char": "q",
+        "block": "minecraft:smooth_stone_slab[type=bottom]"
+      },
+      {
+        "char": "s",
+        "block": "minecraft:lantern[hanging=false,waterlogged=false]",
+        "torch": true
+      }
+    ]
+  }
+}

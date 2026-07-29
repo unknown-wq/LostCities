@@ -1,6 +1,7 @@
 package com.lostbuildings.registry;
 
 import com.lostbuildings.LostBuildings;
+import com.lostbuildings.world.structure.piece.AirportPiece;
 import com.lostbuildings.world.structure.piece.BridgePiece;
 import com.lostbuildings.world.structure.piece.BuildingPiece;
 import com.lostbuildings.world.structure.piece.ParkPiece;
@@ -32,6 +33,7 @@ public final class ModStructurePieceTypes {
 	public static final StructurePieceType STREET = (StructurePieceType.ContextlessType) StreetPiece::new;
 	public static final StructurePieceType PARK = (StructurePieceType.ContextlessType) ParkPiece::new;
 	public static final StructurePieceType BRIDGE = (StructurePieceType.ContextlessType) BridgePiece::new;
+	public static final StructurePieceType AIRPORT = (StructurePieceType.ContextlessType) AirportPiece::new;
 
 	private ModStructurePieceTypes() {
 	}
@@ -41,6 +43,7 @@ public final class ModStructurePieceTypes {
 		register("street", STREET);
 		register("park", PARK);
 		register("bridge", BRIDGE);
+		register("airport", AIRPORT);
 	}
 
 	private static void register(String name, StructurePieceType type) {
