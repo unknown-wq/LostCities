@@ -141,6 +141,15 @@ public abstract class CityPiece extends StructurePiece {
 	 *
 	 * <p>Deliberately additive: nothing already placed is replaced, the layer simply goes on top.
 	 * A building whose roof is glass keeps its glass, with snow on it.
+	 *
+	 * <p><b>The block at {@code top} is not read, because the heightmap already answered.</b>
+	 * {@code WORLD_SURFACE_WG}'s predicate is exactly "not air" and {@code getHeight} returns one past
+	 * the highest block that matches it, so {@code getBlockState(x, top, z).isAir()} is true by
+	 * construction — the same invariant {@code Foundation.build} and {@code Streets.paveColumn} bound
+	 * their clear loops with. Asking the world for it was one guaranteed-true probe per column: 256
+	 * per weathered cell, 14,592 over the 57 weathered cells of a snowy 9x9 city, exactly half of the
+	 * pass's reads. The <em>second</em> probe, at {@code top - 1}, is a real question (is the surface
+	 * something snow can settle on) and is still asked.
 	 */
 	protected void weather(WorldGenLevel level, BoundingBox chunkBox, long worldSeed) {
 		BlockState cover = switch (this.climate) {
@@ -165,7 +174,7 @@ public abstract class CityPiece extends StructurePiece {
 				}
 				int top = level.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x, z);
 				cursor.set(x, top, z);
-				if (!chunkBox.isInside(cursor) || !level.getBlockState(cursor).isAir()) {
+				if (!chunkBox.isInside(cursor)) {
 					continue;
 				}
 				cursor.set(x, top - 1, z);
