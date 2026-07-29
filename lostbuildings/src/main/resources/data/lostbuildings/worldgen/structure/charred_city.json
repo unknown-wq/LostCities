@@ -1,0 +1,33 @@
+{
+  "type": "lostbuildings:lost_city",
+  "biomes": "#desolation:charred_forests",
+  "step": "surface_structures",
+  "spawn_overrides": {},
+  "buildings": [
+    "charred_tower",
+    "charred_timber_tower",
+    "charred_block",
+    "charred_annex"
+  ],
+  "min_floors": 2,
+  "max_floors": 5,
+  "city_size": 5,
+  "density": 0.6,
+  "cellars": 1,
+  "damage_chance": 0.55,
+  "streets": {
+    "block": {
+      "Name": "minecraft:blackstone"
+    },
+    "lamp_spacing": 0,
+    "pothole_chance": 0.18
+  },
+  "content": {
+    "parks": [
+      "charred_park_ash"
+    ],
+    "park_chance": 0.3,
+    "multi_buildings": [],
+    "downtown_chance": 0.0
+  }
+}

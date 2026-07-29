@@ -224,6 +224,24 @@
       "block": "minecraft:dirt"
     },
     {
+      "char": "o",
+      "blocks": [
+        {
+          "random": 40,
+          "block": "minecraft:cracked_stone_bricks"
+        },
+        {
+          "random": 30,
+          "block": "minecraft:mossy_stone_brick_wall"
+        },
+        {
+          "random": 1000,
+          "block": "minecraft:stone_brick_wall"
+        }
+      ],
+      "damaged": "minecraft:iron_bars"
+    },
+    {
       "char": " ",
       "block": "minecraft:air"
     },

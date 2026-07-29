@@ -1,0 +1,83 @@
+{
+  "xsize": 16,
+  "zsize": 16,
+  "palette": {
+    "palette": [
+      {
+        "char": "n",
+        "blocks": [
+          {
+            "random": 40,
+            "block": "desolation:ash[layers=1]"
+          },
+          {
+            "random": 30,
+            "block": "desolation:ash[layers=2]"
+          },
+          {
+            "random": 20,
+            "block": "desolation:ash[layers=3]"
+          },
+          {
+            "random": 1000,
+            "block": "desolation:ash[layers=1]"
+          }
+        ]
+      },
+      {
+        "char": "m",
+        "block": "desolation:ash_block"
+      },
+      {
+        "char": "e",
+        "block": "desolation:ash_bramble"
+      },
+      {
+        "char": "r",
+        "block": "desolation:charred_log[axis=y]"
+      },
+      {
+        "char": "j",
+        "block": "desolation:charred_branches[persistent=true]"
+      }
+    ]
+  },
+  "slices": [
+    [
+      "                ",
+      " nnne nn   nnnr ",
+      "nnnr nmnne  nn  ",
+      " nnnn   nn   mn ",
+      "n  nnn   nne  nn",
+      "  nm  nn  mn   n",
+      " nn  nn  n  rnn ",
+      "nne n   nn   nn ",
+      "  nnn enn  nne n",
+      " m   nnn  nn  nn",
+      "n   nr   nn  nm ",
+      "e nn  nmn   n  n",
+      " nn  m  ennn  n ",
+      "n  nn   nmr nn n",
+      "  ne  nn  nm  ne",
+      " n  nn  n   nn  "
+    ],
+    [
+      "              j ",
+      "   j         jrj",
+      "  jrj         j ",
+      "   j            ",
+      "                ",
+      "            j   ",
+      "           jrj  ",
+      "            j   ",
+      "                ",
+      "     j          ",
+      "    jrj         ",
+      "     j          ",
+      "          j     ",
+      "         jrj    ",
+      "          j     ",
+      "                "
+    ]
+  ]
+}
