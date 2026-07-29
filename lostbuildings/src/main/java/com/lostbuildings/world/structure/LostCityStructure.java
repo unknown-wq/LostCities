@@ -149,12 +149,19 @@ public class LostCityStructure extends Structure {
 						this.config.parkName(cell.variant()), style, climate));
 				case STREET -> {
 					if (needsBridge(context, cell, groundY) && !streets.bridges().isEmpty()) {
+						// Hashed on the coordinate ACROSS the crossing — the one value every cell of one
+						// crossing shares — so a river is spanned by one bridge rather than by an
+						// alternating chain of open and covered cells. This is only the fallback: the
+						// city style's own bridge list wins, and that is resolved in the piece, where the
+						// assets exist. See BridgePiece.Spans.familyFor.
+						boolean westEast = (cell.neighbourMask() & (CityLayout.WEST | CityLayout.EAST)) != 0;
+						int across = westEast ? cell.chunkZ() : cell.chunkX();
 						int pick = (int) Math.floorMod(
-								CityLayout.hash(context.seed(), cell.chunkX(), cell.chunkZ(), 0x5E),
+								CityLayout.hash(context.seed(), across, westEast ? 0 : 1, 0x5E),
 								streets.bridges().size());
 						builder.addPiece(new BridgePiece(cell.chunkX(), cell.chunkZ(), groundY,
 								this.config.bridgeName(pick), style,
-								BridgePiece.turnsForMask(cell.neighbourMask()), climate));
+								BridgePiece.turnsForMask(cell.neighbourMask()), cell.neighbourMask(), climate));
 					} else {
 						builder.addPiece(new StreetPiece(
 								cell.chunkX(), cell.chunkZ(), groundY,

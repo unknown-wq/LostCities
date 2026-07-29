@@ -9,7 +9,12 @@ import com.lostbuildings.world.feature.StyleSelector;
 import com.lostbuildings.world.structure.CityLayout;
 import com.lostbuildings.world.structure.StreetDecor;
 import net.minecraft.SharedConstants;
+import com.lostbuildings.engine.Assets;
+import com.lostbuildings.engine.codec.CityStyleRE;
+import com.lostbuildings.engine.codec.ObjectSelector;
+import com.lostbuildings.engine.codec.SelectorsRE;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.Bootstrap;
 import net.minecraft.world.level.WorldGenLevel;
 import net.minecraft.world.level.block.Blocks;
@@ -27,6 +32,7 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Optional;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -71,6 +77,8 @@ class BridgePieceTest {
 	private static final int WEST_EAST = CityLayout.WEST | CityLayout.EAST;
 	private static final int NORTH_SOUTH = CityLayout.NORTH | CityLayout.SOUTH;
 	private static final int ALL = CityLayout.ALL_SIDES;
+	/** An arbitrary but fixed world seed, so every assertion here is reproducible. */
+	private static final long SEED = 0x1057C1719ABCDL;
 
 	@BeforeAll
 	static void bootstrapMinecraft() {
@@ -80,30 +88,95 @@ class BridgePieceTest {
 
 	// ------------------------------------------------------------------ the placement code
 
-	/**
-	 * The packed placement code still reads as a rotation to anyone who treats it as one — which is
-	 * what {@code LostCityStructure} and the piece's own constructor do — and round-trips the mask.
-	 */
+	/** The turn is a turn: the parts run west-east unrotated, so only a north-south road is turned. */
 	@Test
-	void thePlacementCodeCarriesBothTheTurnAndTheMask() {
+	void onlyANorthSouthRoadIsQuarterTurned() {
 		for (int mask = 1; mask <= ALL; mask++) {
-			int placement = BridgePiece.turnsForMask(mask);
 			boolean alongX = (mask & WEST_EAST) != 0;
-			assertEquals(alongX ? 0 : 1, Math.floorMod(placement, 4),
-					"mask " + mask + ": the low two bits must still be the quarter turn, because every"
-							+ " caller reads them as one");
-			assertEquals(mask, BridgePiece.maskOf(placement),
-					"mask " + mask + " did not survive the round trip");
+			assertEquals(alongX ? 0 : 1, BridgePiece.turnsForMask(mask),
+					"mask " + mask + ": the quarter turn is wrong for this axis");
 		}
 	}
 
-	/** A placement code written by the older piece — a bare 0 or 1 — still means a through road. */
+	/** The mask survives the piece's own NBT round trip, which is how a reloaded world gets it back. */
 	@Test
-	void aLegacyPlacementCodeStillDescribesAThroughRoad() {
-		assertEquals(WEST_EAST, BridgePiece.maskOf(0),
-				"an old saved bridge with Turns=0 must come back as a west-east road, not as a cell"
-						+ " with no roads at all (which would parapet all four sides shut)");
-		assertEquals(NORTH_SOUTH, BridgePiece.maskOf(1));
+	void theMaskSurvivesTheNbtRoundTrip() {
+		for (int mask = 1; mask <= ALL; mask++) {
+			assertEquals(mask, new BridgePiece(savedTag(BridgePiece.turnsForMask(mask), mask)).neighbourMask(),
+					"mask " + mask + " did not survive being saved and loaded");
+		}
+	}
+
+	/**
+	 * A bridge saved before the mask was carried has only a Turns tag. It must come back as the
+	 * through road that turn implies — not as a cell with no roads at all, which would parapet all
+	 * four sides shut and wall the road off.
+	 */
+	@Test
+	void aLegacyBridgeWithoutAMaskStillDescribesAThroughRoad() {
+		assertEquals(WEST_EAST, new BridgePiece(savedTag(0, 0)).neighbourMask(),
+				"an old saved bridge with Turns=0 and no Neighbours must come back as a west-east road,"
+						+ " not as a cell with no roads at all, which would parapet all four sides shut");
+		assertEquals(NORTH_SOUTH, new BridgePiece(savedTag(1, 0)).neighbourMask());
+	}
+
+	/**
+	 * The NBT a saved bridge actually carries. The bounding box is written by the vanilla
+	 * {@code StructurePiece} and is required to read one back, so a hand-built tag has to include it.
+	 * A {@code Neighbours} of 0 stands for the tag being absent, which is the pre-mask save format.
+	 */
+	private static CompoundTag savedTag(int turns, int mask) {
+		CompoundTag tag = new CompoundTag();
+		tag.store("BB", BoundingBox.CODEC, new BoundingBox(0, GROUND_Y - 20, 0, 15, GROUND_Y + 18, 15));
+		tag.putInt("GroundY", GROUND_Y);
+		tag.putString("Climate", StyleSelector.Climate.TEMPERATE.name());
+		tag.putString("Part", "bridge_open");
+		tag.putString("Style", "citystyle_standard");
+		tag.putInt("Turns", turns);
+		tag.putInt("Neighbours", mask);
+		return tag;
+	}
+
+	/**
+	 * The city style's {@code selectors.bridges} decides the family, and one crossing gets one family.
+	 *
+	 * <p>Before this the field was parsed and read by nothing, and the family was rolled per cell at
+	 * structure-start, so a single river crossing alternated open and covered every sixteen blocks.
+	 */
+	@Test
+	void theCityStyleChoosesTheBridgeFamilyOncePerCrossing() {
+		Assets assets = new Assets();
+		assets.getCityStyles().put("test_style", cityStyleNaming("bridge_covered"));
+
+		// Every cell of one west-east crossing shares its chunk Z, so all of them must agree.
+		for (int cellX = -4; cellX <= 4; cellX++) {
+			assertEquals("bridge_covered",
+					BridgePiece.Spans.familyFor(assets, "test_style", "bridge_open", WEST_EAST, SEED, cellX, 7),
+					"cell " + cellX + " of one crossing picked a different family");
+		}
+	}
+
+	/** With no assets, or a style naming no bridges, the name handed down by the structure stands. */
+	@Test
+	void theStructuresChoiceStandsWhenTheStyleNamesNoBridges() {
+		assertEquals("bridge_open",
+				BridgePiece.Spans.familyFor(null, "test_style", "bridge_open", WEST_EAST, SEED, 0, 0),
+				"with no assets loaded the fallback must be used, not an empty name");
+
+		Assets empty = new Assets();
+		assertEquals("bridge_open",
+				BridgePiece.Spans.familyFor(empty, "missing_style", "bridge_open", WEST_EAST, SEED, 0, 0),
+				"an unknown city style must fall back, not blank the bridge");
+	}
+
+	private static CityStyleRE cityStyleNaming(String... bridges) {
+		List<ObjectSelector> selectors = new ArrayList<>();
+		for (String bridge : bridges) {
+			selectors.add(new ObjectSelector(1.0F, bridge));
+		}
+		SelectorsRE s = new SelectorsRE(null, null, null, null, selectors, null, null);
+		return new CityStyleRE(Optional.empty(), Optional.empty(), Optional.empty(), Optional.empty(),
+				Optional.empty(), Optional.empty(), Optional.of(s));
 	}
 
 	// ------------------------------------------------------------------ the seam
@@ -587,7 +660,7 @@ class BridgePieceTest {
 
 	private static BridgePiece piece(int cellX, int cellZ, int mask) {
 		return new BridgePiece(cellX, cellZ, GROUND_Y, "bridge_open", "citystyle_standard",
-				BridgePiece.turnsForMask(mask), StyleSelector.Climate.TEMPERATE);
+				BridgePiece.turnsForMask(mask), mask, StyleSelector.Climate.TEMPERATE);
 	}
 
 	private static Map<BlockPos, BlockState> generate(int cellX, int cellZ, int mask, int terrainTop) {

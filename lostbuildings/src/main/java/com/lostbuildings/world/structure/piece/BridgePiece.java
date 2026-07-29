@@ -6,6 +6,9 @@ import com.lostbuildings.engine.BuildingEngine;
 import com.lostbuildings.engine.BuildingPart;
 import com.lostbuildings.engine.CompiledPalette;
 import com.lostbuildings.engine.Style;
+import com.lostbuildings.engine.codec.CityStyleRE;
+import com.lostbuildings.engine.codec.ObjectSelector;
+import com.lostbuildings.engine.codec.SelectorsRE;
 import com.lostbuildings.engine.Transform;
 import com.lostbuildings.registry.ModStructurePieceTypes;
 import com.lostbuildings.world.feature.StyleSelector;
@@ -27,6 +30,8 @@ import net.minecraft.world.level.block.state.properties.SlabType;
 import net.minecraft.world.level.chunk.ChunkGenerator;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.levelgen.structure.pieces.StructurePieceSerializationContext;
+
+import java.util.List;
 
 /**
  * A street cell that spans water or a drop instead of stopping at it (PORT #6).
@@ -147,28 +152,38 @@ public class BridgePiece extends CityPiece {
 	private static final int SALT_HANGER = 0x15;
 	private static final int SALT_RUIN = 0x16;
 	private static final int SALT_CROSSING = 0x17;
+	/** Salt for the family roll, independent of the structural-style roll that shares its inputs. */
+	private static final int SALT_FAMILY = 0x18;
 
 	private static final BlockState AIR = Blocks.AIR.defaultBlockState();
 
 	private final String partName;
 	private final String styleName;
-	/** Packed placement code — see {@link #turnsForMask}. Low two bits are the quarter turn. */
+	/** Quarter turn applied to the part: 0 for a west–east bridge, 1 for a north–south one. */
 	private final int quarterTurns;
+	/** Which of the four sides carry a road — see {@link #neighbourMask()}. */
+	private final int neighbourMask;
 
 	public BridgePiece(int chunkX, int chunkZ, int groundY, String partName, String styleName, int quarterTurns,
-	                   StyleSelector.Climate climate) {
+	                   int neighbourMask, StyleSelector.Climate climate) {
 		super(ModStructurePieceTypes.BRIDGE, cellBox(chunkX, chunkZ, groundY, BELOW_GROUND, ABOVE_GROUND), groundY,
 				climate);
 		this.partName = partName;
 		this.styleName = styleName;
 		this.quarterTurns = quarterTurns;
+		this.neighbourMask = neighbourMask;
 	}
 
 	public BridgePiece(CompoundTag tag) {
 		super(ModStructurePieceTypes.BRIDGE, tag);
 		this.partName = tag.getStringOr("Part", "");
 		this.styleName = tag.getStringOr("Style", StyleSelector.DEFAULT_STYLE);
-		this.quarterTurns = tag.getIntOr("Turns", 0);
+		this.quarterTurns = Math.floorMod(tag.getIntOr("Turns", 0), 4);
+		// A world saved before the mask was carried has no Neighbours tag. Fall back to the through
+		// road its quarter turn implies, which is what such a piece drew anyway.
+		this.neighbourMask = tag.getIntOr("Neighbours", 0) == 0
+				? (this.quarterTurns == 0 ? CityLayout.WEST | CityLayout.EAST : CityLayout.NORTH | CityLayout.SOUTH)
+				: tag.getIntOr("Neighbours", 0);
 	}
 
 	@Override
@@ -177,45 +192,29 @@ public class BridgePiece extends CityPiece {
 		tag.putString("Part", this.partName);
 		tag.putString("Style", this.styleName);
 		tag.putInt("Turns", this.quarterTurns);
+		tag.putInt("Neighbours", this.neighbourMask);
 	}
 
 	/**
-	 * The placement code for a road with this connectivity mask.
+	 * The quarter turn a road with this connectivity mask needs.
 	 *
-	 * <p><b>The low two bits are the quarter turn</b>, exactly as before: the parts run west–east
-	 * unrotated, so a road that continues north or south (and not east or west) is the one that needs
-	 * the turn, and every caller that does what the constructor does — {@code Math.floorMod(v, 4)} —
-	 * keeps reading a rotation out of it. The <b>upper bits carry the mask itself</b>, because a
-	 * bridge needs to know which of its four sides carry a road for exactly the same reasons a street
-	 * cell does: which columns are carriageway, which are footway, where the kerb ring runs and which
-	 * edges get a parapet. A rotation alone cannot express a bridged crossroads, and pretending it
-	 * could is what made two bridged arms of one junction cut through each other.
+	 * <p>The parts run west–east unrotated, so it is the road continuing north or south — and not
+	 * east or west — that needs the turn.
 	 *
-	 * <p>Packed rather than added as a second constructor argument so that the call in
-	 * {@code LostCityStructure} — which is not this piece's to edit — needs no change at all. The
-	 * value is round-tripped through the {@code Turns} tag, and {@link #maskOf} tolerates a value
-	 * written by the older piece (upper bits zero) by falling back to the axis the turn implies.
+	 * <p>The mask itself is <em>not</em> encoded here. A bridge needs to know which of its four sides
+	 * carry a road for the same reasons a street cell does: which columns are carriageway, which are
+	 * footway, where the kerb ring runs, which edges get a parapet. A rotation alone cannot express a
+	 * bridged crossroads, and pretending it could is what made two arms of one bridged junction cut
+	 * through each other. So the mask travels as its own constructor argument and its own NBT tag,
+	 * the way {@code StreetPiece} has always carried it.
 	 */
 	public static int turnsForMask(int mask) {
-		boolean alongX = (mask & (CityLayout.WEST | CityLayout.EAST)) != 0;
-		int turns = alongX ? 0 : 1;
-		return ((mask & CityLayout.ALL_SIDES) << 2) | turns;
+		return (mask & (CityLayout.WEST | CityLayout.EAST)) != 0 ? 0 : 1;
 	}
 
-	/** The connectivity mask packed into a placement code, or the through-road implied by its turn. */
-	public static int maskOf(int placement) {
-		int mask = (placement >> 2) & CityLayout.ALL_SIDES;
-		if (mask != 0) {
-			return mask;
-		}
-		return Math.floorMod(placement, 4) == 0
-				? CityLayout.WEST | CityLayout.EAST
-				: CityLayout.NORTH | CityLayout.SOUTH;
-	}
-
-	/** This cell's road-connectivity mask. */
+	/** This cell's road-connectivity mask: which of its four sides a road continues over. */
 	public int neighbourMask() {
-		return maskOf(this.quarterTurns);
+		return this.neighbourMask;
 	}
 
 	@Override
@@ -230,7 +229,9 @@ public class BridgePiece extends CityPiece {
 
 		Assets assets = LostBuildings.ASSETS;
 		BuildingEngine engine = LostBuildings.ENGINE;
-		Spans.Span span = Spans.forCell(mask, seed, cellChunkX(), cellChunkZ(), this.partName);
+		String family = Spans.familyFor(assets, this.styleName, this.partName, mask, seed,
+				cellChunkX(), cellChunkZ());
+		Spans.Span span = Spans.forCell(mask, seed, cellChunkX(), cellChunkZ(), family);
 
 		BuildingPart part = null;
 		CompiledPalette palette = null;
@@ -671,6 +672,41 @@ public class BridgePiece extends CityPiece {
 				case ARCH -> ARCH;
 			};
 			return new Span(base + suffix, quarterTurns, style, tower);
+		}
+
+		/**
+		 * Which bridge family this cell is built from — {@code bridge_open}, {@code bridge_covered},
+		 * or whatever else the city style names.
+		 *
+		 * <p><b>Why it is resolved here and not at structure-start.</b> The city style lives in the
+		 * datapack, and {@code LostCityStructure} deliberately touches no assets: a structure start can
+		 * be computed before the datapack has finished loading, which is why every asset lookup in this
+		 * mod is deferred to the piece. So the name handed down from the structure is a fallback, and
+		 * the city style's own {@code selectors.bridges} is preferred here, where the assets exist.
+		 * Before this the field was parsed by {@code SelectorsRE} and read by nothing, so editing a
+		 * city style's bridges did precisely nothing.
+		 *
+		 * <p><b>Hashed across the axis, not per cell.</b> Every cell of one crossing shares the
+		 * coordinate across it, so a whole river crossing is one family. Hashing per cell — which is
+		 * what the structure-start fallback used to do — alternated open and covered every sixteen
+		 * blocks along a single bridge.
+		 */
+		public static String familyFor(Assets assets, String cityStyleName, String fallback, int mask,
+		                               long seed, int cellX, int cellZ) {
+			CityStyleRE cityStyle = assets == null || cityStyleName == null
+					? null : assets.getCityStyle(cityStyleName);
+			SelectorsRE selectors = cityStyle == null ? null : cityStyle.getSelectors();
+			List<ObjectSelector> families = selectors == null || selectors.bridges() == null
+					? List.of() : selectors.bridges();
+			if (families.isEmpty()) {
+				return fallback;
+			}
+			boolean westEast = (mask & (CityLayout.WEST | CityLayout.EAST))
+					== (CityLayout.WEST | CityLayout.EAST);
+			int across = westEast ? cellZ : cellX;
+			int axis = westEast ? 0 : 1;
+			long h = CityLayout.hash(seed, across, axis, SALT_FAMILY);
+			return families.get((int) Math.floorMod(h, families.size())).value();
 		}
 
 		/**
